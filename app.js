@@ -198,10 +198,13 @@ function renderTabelle() {
       '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
       '<td style="font-weight:700">' + t.gegner + '</td>' +
       '<td><span class="ampel ' + kl + '"><span class="ampel-dot"></span>' + ampelLabels[kl] + ' · ' + txt + '</span></td>' +
-      '<td style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
-        '<a class="btn-abfrage" href="' + abfrageLink + '" target="_blank">Link öffnen</a>' +
-        '<button class="btn-wa" onclick="kopierenWA(this, \'' + waText.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')">📋 Kopieren</button>' +
+      '<td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+        '<a class="btn-abfrage" href="' + abfrageLink + '" target="_blank">🔗 Link öffnen</a>' +
+        '<button class="btn-wa" onclick="kopierenWA(this, \'' + waText.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')">💬 Kopie für WhatsApp</button>' +
         '<button class="btn-detail" onclick="zeigeDetail(\'' + t.id + '\')">👥 Wer?</button>' +
+        '<button class="btn-verschiebung' + (t.status === 'Verschiebung nötig' ? ' aktiv' : '') + '" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')">' +
+          (t.status === 'Verschiebung nötig' ? '⚠️ Verschoben nötig' : '↔️ Verschiebung') +
+        '</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -262,6 +265,79 @@ function zeigeDetail(terminId) {
     '</div>';
   modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
+}
+
+// ============================================================
+// Verschiebung melden / Admin: neuen Termin eintragen
+// ============================================================
+async function meldeVerschiebung(terminId, aktuellerStatus) {
+  const termin = alleTermine.find(t => t.id === terminId);
+  if (!termin) return;
+
+  if (istAdmin) {
+    zeigeVerschiebungsModal(termin);
+  } else {
+    const neuerStatus = aktuellerStatus === 'Verschiebung nötig' ? 'Geplant' : 'Verschiebung nötig';
+    const bestaetigt  = confirm(
+      neuerStatus === 'Verschiebung nötig'
+        ? 'Verschiebungsbedarf für "' + termin.gegner + '" melden?\n\nDer Admin trägt den neuen Termin ein.'
+        : 'Verschiebungsmeldung zurückziehen?'
+    );
+    if (!bestaetigt) return;
+    const { error } = await sb.from('spieltermine').update({ status: neuerStatus }).eq('id', terminId);
+    if (error) { alert('Fehler: ' + error.message); return; }
+    await ladeMannschaft(aktiveMannschaft.id);
+  }
+}
+
+function zeigeVerschiebungsModal(termin) {
+  const d = new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px';
+  modal.innerHTML =
+    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:480px;width:100%">' +
+      '<div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">' +
+        '<div><div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:16px;color:#F07830">Termin verschieben</div>' +
+        '<div style="font-size:13px;color:#8996B4;margin-top:2px">' + (termin.heim?'Heimspiel':'Auswärtsspiel') + ' gegen ' + termin.gegner + ' · ' + d + '</div></div>' +
+        '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
+      '</div>' +
+      '<div style="padding:24px;display:grid;gap:16px">' +
+        '<div><label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Neues Datum</label>' +
+        '<input type="date" id="v-datum" value="' + termin.datum + '" style="width:100%;padding:10px 14px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:14px;outline:none"></div>' +
+        '<div><label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Neue Uhrzeit</label>' +
+        '<input type="time" id="v-uhrzeit" value="' + (termin.uhrzeit?termin.uhrzeit.slice(0,5):'') + '" style="width:100%;padding:10px 14px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:14px;outline:none"></div>' +
+        '<div><label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Status</label>' +
+        '<select id="v-status" style="width:100%;padding:10px 14px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:14px;outline:none">' +
+          '<option value="Verschoben"' + (termin.status==='Verschoben'?' selected':'') + '>Verschoben</option>' +
+          '<option value="Geplant"'    + (termin.status==='Geplant'   ?' selected':'') + '>Geplant</option>' +
+          '<option value="Bestätigt"'  + (termin.status==='Bestätigt' ?' selected':'') + '>Bestätigt</option>' +
+        '</select></div>' +
+        '<div style="background:rgba(212,98,10,0.1);border:1px solid rgba(212,98,10,0.25);border-radius:8px;padding:12px;font-size:13px;color:#F07830">' +
+          '⚠️ Bestehende Abstimmungen werden gelöscht. Der MF schickt danach den neuen Link per WhatsApp.' +
+        '</div>' +
+        '<button onclick="speichereVerschiebung(\'' + termin.id + '\')" style="padding:12px;background:#D4620A;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:15px;cursor:pointer">Termin verschieben &amp; Abstimmung löschen</button>' +
+      '</div>' +
+    '</div>';
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+async function speichereVerschiebung(terminId) {
+  const datum   = document.getElementById('v-datum').value;
+  const uhrzeit = document.getElementById('v-uhrzeit').value;
+  const status  = document.getElementById('v-status').value;
+  if (!datum) { alert('Bitte ein Datum eingeben.'); return; }
+
+  const neuerToken = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+  const { error: te } = await sb.from('spieltermine').update({
+    datum: datum, uhrzeit: uhrzeit || null, status: status, abfrage_token: neuerToken
+  }).eq('id', terminId);
+  if (te) { alert('Fehler: ' + te.message); return; }
+
+  await sb.from('verfuegbarkeiten').delete().eq('spieltermin_id', terminId);
+  document.querySelector('[style*="fixed"]')?.remove();
+  await ladeMannschaft(aktiveMannschaft.id);
+  alert('✓ Termin verschoben. Der MF kann jetzt den neuen Link per WhatsApp schicken.');
 }
 
 // ============================================================
