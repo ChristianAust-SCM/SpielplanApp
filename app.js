@@ -172,6 +172,12 @@ function renderTabelle() {
 
     const ampelLabels = { ok: 'Ausreichend', warn: 'Knapp', crit: 'Kritisch', offen: 'Offen' };
 
+    // WhatsApp-Text
+    const datumLang = new Date(t.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+    const heimAusw  = t.heim ? 'Heimspiel' : 'Auswärtsspiel';
+    const mfName    = aktiveMannschaft?.mf_name?.split(' ')[0] || 'Euer MF';
+    const waText = `Hallo zusammen,\nbitte meldet eure Verfügbarkeit für unser Spiel:\n\n🏓 ${heimAusw} gegen ${t.gegner}\n📅 ${datumLang}${uhr ? ' · ' + uhr : ''}\n\n👉 ${abfrageLink}\n\nBitte bis Mittwoch antworten. Danke!\n– ${mfName}`;
+
     return `<tr>
       <td>
         <div class="datum-block">
@@ -187,8 +193,9 @@ function renderTabelle() {
           ${ampelLabels[kl]} · ${txt}
         </span>
       </td>
-      <td>
-        <a class="btn-abfrage" href="${abfrageLink}" target="_blank">Abfrage-Link</a>
+      <td style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <a class="btn-abfrage" href="${abfrageLink}" target="_blank">Link öffnen</a>
+        <button class="btn-wa" onclick="kopierenWA(this, \`${waText.replace(/`/g,"'")}\`)" title="WhatsApp-Text kopieren">📋 Kopieren</button>
       </td>
     </tr>`;
   }).join('');
@@ -206,6 +213,36 @@ function renderTabelle() {
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
+}
+
+// ============================================================
+// WhatsApp-Text kopieren
+// ============================================================
+function kopierenWA(btn, text) {
+  navigator.clipboard.writeText(text).then(function() {
+    btn.textContent = '✓ Kopiert!';
+    btn.classList.add('kopiert');
+    setTimeout(function() {
+      btn.textContent = '📋 Kopieren';
+      btn.classList.remove('kopiert');
+    }, 2500);
+  }).catch(function() {
+    // Fallback für ältere Browser
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✓ Kopiert!';
+    btn.classList.add('kopiert');
+    setTimeout(function() {
+      btn.textContent = '📋 Kopieren';
+      btn.classList.remove('kopiert');
+    }, 2500);
+  });
 }
 
 // ============================================================
