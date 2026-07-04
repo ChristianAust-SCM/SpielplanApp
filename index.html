@@ -279,7 +279,10 @@
     <div class="header-brand">Spielplan-App · FC Strass e.V.</div>
     <div class="header-sub">Verfügbarkeiten Saison 2026/27</div>
   </div>
-  <div class="header-right" id="header-status">Verbinde...</div>
+  <div class="header-right" style="display:flex;align-items:center;gap:12px">
+    <button id="btn-export" onclick="exportExcel()" style="padding:7px 14px;border-radius:6px;background:rgba(29,158,117,0.15);border:1px solid rgba(29,158,117,0.35);color:#4FD4A8;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif;transition:all 140ms" onmouseover="this.style.background='rgba(29,158,117,0.28)'" onmouseout="this.style.background='rgba(29,158,117,0.15)'">📊 Excel exportieren</button>
+    <div id="header-status">Verbinde...</div>
+  </div>
 </header>
 
 <main class="main">
@@ -341,5 +344,6 @@ async function abmelden() {
 }
 </script>
 <script src="app.js"></script>
+<script src="export.js"></script>
 </body>
 </html>
