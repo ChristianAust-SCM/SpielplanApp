@@ -5,7 +5,7 @@
 const SUPABASE_URL  = 'https://nwutgxjnverlvmkrpiep.supabase.co';       // z.B. https://xyzxyz.supabase.co
 const SUPABASE_ANON = 'sb_publishable_09tn0DY3wswcIVQ-mN1S8A_znKWQXaF';             // Settings → API → anon public
 const VEREIN_KUERZEL = 'fcstrass';
-const MIN_SPIELER = 4;                             // Mindestanzahl für "ausreichend"
+const MIN_SPIELER = 6;                             // Mindestanzahl für "ausreichend"
 
 // ============================================================
 // Init
@@ -135,18 +135,18 @@ function ampelKlasse(terminId) {
   const hatAbfrage = alleVerfueg.some(v => v.spieltermin_id === terminId);
   if (!hatAbfrage) return 'offen';
   const ja = zaehleAntworten(terminId, 'Ja');
-  if (ja >= MIN_SPIELER) return 'ok';
-  if (ja >= MIN_SPIELER - 1) return 'warn';
-  return 'crit';
+  if (ja >= MIN_SPIELER) return 'ok';        // 6+ Ja → spielbereit
+  if (ja >= 4) return 'warn';               // 4-5 Ja → zu wenig, prüfen
+  return 'crit';                            // unter 4 → nicht spielbereit
 }
 
 function ampelText(terminId) {
   const hat = alleVerfueg.some(v => v.spieltermin_id === terminId);
   if (!hat) return 'Keine Abfrage';
-  const ja = zaehleAntworten(terminId, 'Ja');
-  const nein = zaehleAntworten(terminId, 'Nein');
-  const bed  = zaehleAntworten(terminId, 'Bedingt');
-  return `${ja} Ja · ${bed} Bedingt · ${nein} Nein`;
+  const ja        = zaehleAntworten(terminId, 'Ja');
+  const nein      = zaehleAntworten(terminId, 'Nein');
+  const vielleicht = zaehleAntworten(terminId, 'Vielleicht');
+  return `${ja} Ja · ${vielleicht} Vielleicht · ${nein} Nein`;
 }
 
 // ============================================================
@@ -170,7 +170,7 @@ function renderTabelle() {
     const txt = ampelText(t.id);
     const abfrageLink = `${baseUrl}spieler.html?token=${t.abfrage_token}`;
 
-    const ampelLabels = { ok: 'Ausreichend', warn: 'Knapp', crit: 'Kritisch', offen: 'Offen' };
+    const ampelLabels = { ok: 'Spielbereit', warn: 'Zu wenig', crit: 'Nicht spielbereit', offen: 'Offen' };
 
     // WhatsApp-Text
     const datumLang = new Date(t.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
