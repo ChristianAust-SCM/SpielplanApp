@@ -4,7 +4,6 @@
 const SUPABASE_URL  = 'https://nwutgxjnverlvmkrpiep.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_09tn0DY3wswcIVQ-mN1S8A_znKWQXaF';
 const VEREIN_KUERZEL = 'fcstrass';
-const MIN_SPIELER = 6;
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -46,7 +45,7 @@ async function init() {
 
     // Mannschaften aus Rollen extrahieren – sortiert nach Name
     alleMannschaften = rollen
-      .map(r => r.mannschaften)
+      .map(r => ({ ...r.mannschaften, min_spieler: r.mannschaften.min_spieler || 6 }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     if (alleMannschaften.length === 0) {
@@ -124,6 +123,7 @@ async function ladeMannschaft(mannschaftId) {
 // ============================================================
 function renderStats() {
   const gesamt = alleTermine.length;
+  const min    = aktiveMannschaft?.min_spieler || 6;
   let offen = 0, krit = 0, ok = 0;
 
   alleTermine.forEach(t => {
@@ -137,6 +137,12 @@ function renderStats() {
   document.getElementById('stat-offen').textContent  = offen;
   document.getElementById('stat-krit').textContent   = krit;
   document.getElementById('stat-ok').textContent     = ok;
+
+  // Labels dynamisch anpassen
+  document.querySelector('[for-stat="krit"]') &&
+    (document.querySelector('[for-stat="krit"]').textContent = `Zu wenig (<${min} Zusagen)`);
+  document.querySelector('[for-stat="ok"]') &&
+    (document.querySelector('[for-stat="ok"]').textContent = `Spielbereit (≥${min} Ja)`);
 }
 
 function zaehleAntworten(terminId, antwort) {
@@ -148,9 +154,10 @@ function zaehleAntworten(terminId, antwort) {
 function ampelKlasse(terminId) {
   const hatAbfrage = alleVerfueg.some(v => v.spieltermin_id === terminId);
   if (!hatAbfrage) return 'offen';
-  const ja = zaehleAntworten(terminId, 'Ja');
-  if (ja >= MIN_SPIELER) return 'ok';
-  if (ja >= 4) return 'warn';
+  const ja  = zaehleAntworten(terminId, 'Ja');
+  const min = aktiveMannschaft?.min_spieler || 6;
+  if (ja >= min)     return 'ok';
+  if (ja >= min - 2) return 'warn';
   return 'crit';
 }
 
