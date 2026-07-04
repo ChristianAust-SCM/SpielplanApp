@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spielplan-App · FC Strass</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    /* ── Reset & Basis ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:   #0D1B2A;
+      --navy2:  #152232;
+      --navy3:  #1e3048;
+      --orange: #D4620A;
+      --orange2:#F07830;
+      --teal:   #1D9E75;
+      --purple: #534AB7;
+      --white:  #F7F9FF;
+      --muted:  #8996B4;
+      --line:   rgba(255,255,255,0.10);
+      --radius: 10px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Calibri, 'Segoe UI', system-ui, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--navy2);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .header-brand {
+      font-family: 'Bahnschrift SemiBold', 'Segoe UI Semibold', sans-serif;
+      font-size: 18px;
+      color: var(--orange2);
+      letter-spacing: 0.03em;
+    }
+    .header-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .header-right { font-size: 12px; color: var(--muted); text-align: right; }
+
+    /* ── Layout ── */
+    .main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+    /* ── Mannschaft-Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 8px 18px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--navy2);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: Calibri, sans-serif;
+      font-size: 14px;
+      transition: all 160ms;
+    }
+    .tab:hover { border-color: var(--orange); color: var(--white); }
+    .tab.active { background: var(--orange); border-color: var(--orange); color: #fff; font-weight: 700; }
+
+    /* ── Statistik-Leiste ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--navy2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .stat-value { font-size: 26px; font-family: 'Bahnschrift SemiBold', sans-serif; color: var(--white); }
+    .stat-value.ok   { color: var(--teal); }
+    .stat-value.warn { color: #F0B429; }
+    .stat-value.crit { color: #E24B4A; }
+
+    /* ── Spielplan-Tabelle ── */
+    .section-title {
+      font-family: 'Bahnschrift SemiBold', 'Segoe UI Semibold', sans-serif;
+      font-size: 15px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+    .spielplan-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .spielplan-table thead tr {
+      background: var(--navy3);
+      border-bottom: 1px solid var(--line);
+    }
+    .spielplan-table th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .spielplan-table td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+    .spielplan-table tbody tr { background: var(--navy2); transition: background 120ms; }
+    .spielplan-table tbody tr:hover { background: var(--navy3); }
+
+    /* Ampel-Badge */
+    .ampel {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .ampel-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .ampel.ok   { background: rgba(29,158,117,0.15); color: #4FD4A8; }
+    .ampel.ok   .ampel-dot { background: #1D9E75; }
+    .ampel.warn { background: rgba(240,180,41,0.15); color: #F0C060; }
+    .ampel.warn .ampel-dot { background: #F0B429; }
+    .ampel.crit { background: rgba(226,75,74,0.15); color: #F08080; }
+    .ampel.crit .ampel-dot { background: #E24B4A; }
+    .ampel.offen { background: rgba(137,150,180,0.12); color: var(--muted); }
+    .ampel.offen .ampel-dot { background: var(--muted); }
+
+    /* H/A Badge */
+    .ha-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .ha-h { background: rgba(83,74,183,0.20); color: #9D96E8; }
+    .ha-a { background: rgba(212,98,10,0.20); color: var(--orange2); }
+
+    /* Datum-Block */
+    .datum-block { line-height: 1.2; }
+    .datum-main { font-weight: 700; color: var(--white); }
+    .datum-sub  { font-size: 12px; color: var(--muted); }
+
+    /* Link-Button */
+    .btn-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 140ms;
+    }
+    .btn-link:hover { border-color: var(--teal); color: var(--teal); }
+    .btn-link svg { width: 13px; height: 13px; }
+
+    /* Abfrage-Button */
+    .btn-abfrage {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 6px;
+      background: var(--teal);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: opacity 140ms;
+    }
+    .btn-abfrage:hover { opacity: 0.85; }
+
+    /* ── Loading / Error ── */
+    .loading {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--muted);
+    }
+    .loading-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--orange);
+      animation: pulse 1.2s ease-in-out infinite;
+      margin: 0 3px;
+    }
+    .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+    .config-hint {
+      background: rgba(212,98,10,0.12);
+      border: 1px solid rgba(212,98,10,0.3);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .config-hint code {
+      background: rgba(255,255,255,0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    @media (max-width: 680px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .header { flex-direction: column; align-items: flex-start; }
+      .spielplan-table th:nth-child(5),
+      .spielplan-table td:nth-child(5) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <div class="header-brand">Spielplan-App · FC Strass e.V.</div>
+    <div class="header-sub">Verfügbarkeiten Saison 2026/27</div>
+  </div>
+  <div class="header-right" id="header-status">Verbinde...</div>
+</header>
+
+<main class="main">
+
+  <!-- Konfigurationshinweis (wird ausgeblendet sobald Daten geladen) -->
+  <div class="config-hint" id="config-hint">
+    <strong style="color:var(--orange2)">Einrichtung erforderlich</strong><br>
+    Trage deine Supabase-Zugangsdaten in <code>app.js</code> ein:<br>
+    <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> aus deinem Supabase-Dashboard (Settings → API).
+  </div>
+
+  <!-- Mannschaft-Tabs -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- Statistik-Leiste -->
+  <div class="stats" id="stats">
+    <div class="stat-card"><div class="stat-label">Spieltage gesamt</div><div class="stat-value" id="stat-gesamt">–</div></div>
+    <div class="stat-card"><div class="stat-label">Abfragen offen</div><div class="stat-value warn" id="stat-offen">–</div></div>
+    <div class="stat-card"><div class="stat-label">Kritisch (&lt;4 Zusagen)</div><div class="stat-value crit" id="stat-krit">–</div></div>
+    <div class="stat-card"><div class="stat-label">Ausreichend (≥4)</div><div class="stat-value ok" id="stat-ok">–</div></div>
+  </div>
+
+  <!-- Spielplan -->
+  <div class="section-title" id="section-title">Vorrunde 2026/27</div>
+  <div id="table-container">
+    <div class="loading">
+      <span class="loading-dot"></span>
+      <span class="loading-dot"></span>
+      <span class="loading-dot"></span>
+      <div style="margin-top:12px;font-size:13px">Lade Spielplan...</div>
+    </div>
+  </div>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verfügbarkeit melden · FC Strass</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:   #0D1B2A;
+      --navy2:  #152232;
+      --navy3:  #1e3048;
+      --orange: #D4620A;
+      --orange2:#F07830;
+      --teal:   #1D9E75;
+      --purple: #534AB7;
+      --white:  #F7F9FF;
+      --muted:  #8996B4;
+      --line:   rgba(255,255,255,0.10);
+      --radius: 10px;
+    }
+    body {
+      font-family: Calibri, 'Segoe UI', system-ui, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+    .card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--navy2);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .card-header {
+      background: var(--navy3);
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--line);
+    }
+    .card-header h1 {
+      font-family: 'Bahnschrift SemiBold', 'Segoe UI Semibold', sans-serif;
+      font-size: 20px;
+      color: var(--orange2);
+      margin-bottom: 4px;
+    }
+    .card-header .meta { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .card-body { padding: 24px; }
+
+    .field { margin-bottom: 20px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .field input[type="text"] {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--navy3);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--white);
+      font-family: Calibri, sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 140ms;
+    }
+    .field input[type="text"]:focus { border-color: var(--teal); }
+    .field input[type="text"]::placeholder { color: var(--muted); }
+
+    /* Antwort-Buttons */
+    .antwort-gruppe {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .antwort-btn {
+      padding: 14px 8px;
+      border-radius: var(--radius);
+      border: 2px solid var(--line);
+      background: var(--navy3);
+      color: var(--muted);
+      font-family: Calibri, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: all 160ms;
+    }
+    .antwort-btn:hover { border-color: rgba(255,255,255,0.25); color: var(--white); }
+    .antwort-btn.selected-ja      { border-color: var(--teal);   background: rgba(29,158,117,0.18); color: #4FD4A8; }
+    .antwort-btn.selected-nein    { border-color: #E24B4A;        background: rgba(226,75,74,0.15); color: #F08080; }
+    .antwort-btn.selected-bedingt { border-color: #F0B429;        background: rgba(240,180,41,0.12); color: #F0C060; }
+
+    .field textarea {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--navy3);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--white);
+      font-family: Calibri, sans-serif;
+      font-size: 14px;
+      outline: none;
+      resize: vertical;
+      min-height: 72px;
+      transition: border-color 140ms;
+    }
+    .field textarea:focus { border-color: var(--teal); }
+    .field textarea::placeholder { color: var(--muted); }
+
+    /* Submit-Button */
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: var(--teal);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Bahnschrift SemiBold', Calibri, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: opacity 160ms;
+      margin-top: 4px;
+    }
+    .btn-submit:hover:not(:disabled) { opacity: 0.88; }
+    .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Erfolg */
+    .success-box {
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .success-icon {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: rgba(29,158,117,0.18);
+      border: 2px solid var(--teal);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 26px;
+    }
+    .success-box h2 {
+      font-family: 'Bahnschrift SemiBold', sans-serif;
+      font-size: 20px;
+      color: var(--teal);
+      margin-bottom: 8px;
+    }
+    .success-box p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+    /* Error */
+    .error-msg {
+      background: rgba(226,75,74,0.12);
+      border: 1px solid rgba(226,75,74,0.3);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #F08080;
+      margin-top: 12px;
+    }
+
+    .divider { border: none; border-top: 1px solid var(--line); margin: 20px 0; }
+    .footer-hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 20px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+<div style="margin-bottom:20px;text-align:center">
+  <div style="font-family:'Bahnschrift SemiBold',sans-serif;font-size:16px;color:var(--orange2)">FC Strass e.V.</div>
+  <div style="font-size:12px;color:var(--muted)">Verfügbarkeitsabfrage</div>
+</div>
+
+<div class="card" id="card">
+  <div class="card-header">
+    <h1 id="spiel-titel">Lade Spieltermin...</h1>
+    <div class="meta" id="spiel-meta"></div>
+  </div>
+  <div class="card-body" id="card-body">
+    <div style="text-align:center;padding:30px;color:var(--muted);font-size:14px">Einen Moment...</div>
+  </div>
+</div>
+
+<div class="footer-hint">
+  Deine Angabe kann jederzeit aktualisiert werden.<br>
+  Fragen? Wende dich direkt an deinen Mannschaftsführer.
+</div>
+
+<script src="app.js"></script>
+<script>
+// Supabase wird aus app.js übernommen (SUPABASE_URL + SUPABASE_ANON)
+// Spieler-Abfrageseite – separater Code
+
+(async function() {
+  const params = new URLSearchParams(window.location.search);
+  const token  = params.get('token');
+  const sbLocal = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  if (!token || SUPABASE_URL === 'DEINE_SUPABASE_URL') {
+    document.getElementById('spiel-titel').textContent = 'Ungültiger Link';
+    document.getElementById('card-body').innerHTML =
+      '<div class="error-msg">Dieser Link ist ungültig oder abgelaufen. Bitte fordere einen neuen Link bei deinem Mannschaftsführer an.</div>';
+    return;
+  }
+
+  // Spieltermin laden
+  const { data: termin, error } = await sbLocal
+    .from('spieltermine')
+    .select('*, mannschaften(name, liga, verein_id)')
+    .eq('abfrage_token', token)
+    .single();
+
+  if (error || !termin) {
+    document.getElementById('spiel-titel').textContent = 'Termin nicht gefunden';
+    document.getElementById('card-body').innerHTML =
+      '<div class="error-msg">Dieser Abfrage-Link ist ungültig. Bitte wende dich an deinen Mannschaftsführer.</div>';
+    return;
+  }
+
+  // Header befüllen
+  const d = new Date(termin.datum);
+  const dt = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+  const uhr = termin.uhrzeit ? termin.uhrzeit.slice(0,5) + ' Uhr' : '';
+  const heimAusw = termin.heim ? 'Heimspiel' : 'Auswärtsspiel';
+
+  document.getElementById('spiel-titel').textContent =
+    `${heimAusw} gegen ${termin.gegner}`;
+  document.getElementById('spiel-meta').innerHTML =
+    `${termin.mannschaften?.name} · ${termin.mannschaften?.liga}<br>${dt}${uhr ? ' · ' + uhr : ''}`;
+
+  // Formular rendern
+  document.getElementById('card-body').innerHTML = `
+    <div class="field">
+      <label>Dein Name</label>
+      <input type="text" id="spieler-name" placeholder="Vorname Nachname" autocomplete="name">
+    </div>
+    <div class="field">
+      <label>Kannst du spielen?</label>
+      <div class="antwort-gruppe">
+        <button class="antwort-btn" data-val="Ja"      onclick="waehleAntwort(this,'selected-ja')">Ja</button>
+        <button class="antwort-btn" data-val="Bedingt" onclick="waehleAntwort(this,'selected-bedingt')">Bedingt</button>
+        <button class="antwort-btn" data-val="Nein"    onclick="waehleAntwort(this,'selected-nein')">Nein</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Anmerkung (optional)</label>
+      <textarea id="anmerkung" placeholder="z.B. Kann erst ab 15 Uhr, oder: Bin auf Reise..."></textarea>
+    </div>
+    <button class="btn-submit" id="btn-senden" onclick="abschicken('${termin.id}')" disabled>
+      Rückmeldung absenden
+    </button>
+    <div id="error-box"></div>
+  `;
+
+  // Formularvalidierung
+  document.getElementById('spieler-name').addEventListener('input', pruefeFormular);
+})();
+
+let gewaehlteAntwort = null;
+
+function waehleAntwort(btn, cls) {
+  document.querySelectorAll('.antwort-btn').forEach(b => b.className = 'antwort-btn');
+  btn.classList.add(cls);
+  gewaehlteAntwort = btn.dataset.val;
+  pruefeFormular();
+}
+
+function pruefeFormular() {
+  const name = document.getElementById('spieler-name')?.value.trim();
+  const btn  = document.getElementById('btn-senden');
+  if (btn) btn.disabled = !(name && name.length > 2 && gewaehlteAntwort);
+}
+
+async function abschicken(terminId) {
+  const name = document.getElementById('spieler-name').value.trim();
+  const anmerkung = document.getElementById('anmerkung')?.value.trim() || '';
+  const btn = document.getElementById('btn-senden');
+  btn.disabled = true;
+  btn.textContent = 'Wird gespeichert...';
+
+  const sbLocal = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  // Spieler suchen oder anlegen (nach Name + Termin-Mannschaft)
+  const { data: termin } = await sbLocal
+    .from('spieltermine').select('mannschaft_id').eq('id', terminId).single();
+
+  let spielerId = null;
+  if (termin) {
+    const { data: sp } = await sbLocal
+      .from('spieler')
+      .select('id')
+      .eq('mannschaft_id', termin.mannschaft_id)
+      .ilike('name', name)
+      .single();
+
+    if (sp) {
+      spielerId = sp.id;
+    } else {
+      const { data: neu } = await sbLocal
+        .from('spieler')
+        .insert({ mannschaft_id: termin.mannschaft_id, name: name, aktiv: true })
+        .select('id').single();
+      spielerId = neu?.id;
+    }
+  }
+
+  if (!spielerId) {
+    document.getElementById('error-box').innerHTML =
+      '<div class="error-msg">Fehler beim Speichern. Bitte versuche es erneut.</div>';
+    btn.disabled = false;
+    btn.textContent = 'Rückmeldung absenden';
+    return;
+  }
+
+  // Upsert Verfügbarkeit (aktualisiert bei erneuter Abgabe)
+  const { error } = await sbLocal.from('verfuegbarkeiten').upsert({
+    spieltermin_id: terminId,
+    spieler_id:     spielerId,
+    antwort:        gewaehlteAntwort,
+    anmerkung:      anmerkung
+  }, { onConflict: 'spieltermin_id,spieler_id' });
+
+  if (error) {
+    document.getElementById('error-box').innerHTML =
+      `<div class="error-msg">Fehler: ${error.message}</div>`;
+    btn.disabled = false;
+    btn.textContent = 'Rückmeldung absenden';
+    return;
+  }
+
+  // Erfolg
+  document.getElementById('card-body').innerHTML = `
+    <div class="success-box">
+      <div class="success-icon">✓</div>
+      <h2>Danke, ${name.split(' ')[0]}!</h2>
+      <p>Deine Rückmeldung (<strong style="color:var(--teal)">${gewaehlteAntwort}</strong>) wurde gespeichert.<br>
+      Du kannst diesen Tab jetzt schließen.</p>
+    </div>`;
+}
+</script>
+</body>
+</html>
