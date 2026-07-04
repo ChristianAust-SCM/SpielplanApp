@@ -300,6 +300,31 @@
 
 </main>
 
+<script>
+// Auth-Check – nicht eingeloggt → Login-Seite
+(async function() {
+  const SUPABASE_URL  = 'https://nwutgxjnverlvmkrpiep.supabase.co';
+  const SUPABASE_ANON = 'sb_publishable_09tn0DY3wswcIVQ-mN1S8A_znKWQXaF';
+  const sbAuth = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  const { data } = await sbAuth.auth.getSession();
+  if (!data.session) {
+    window.location.href = 'login.html';
+    return;
+  }
+  // Nutzername im Header anzeigen
+  const email = data.session.user.email;
+  const headerRight = document.getElementById('header-status');
+  if (headerRight) {
+    headerRight.innerHTML = email + ' &nbsp;·&nbsp; <a href="#" onclick="abmelden()" style="color:var(--muted);text-decoration:underline;font-size:12px">Abmelden</a>';
+  }
+  window.sbAuth = sbAuth;
+})();
+
+async function abmelden() {
+  if (window.sbAuth) await window.sbAuth.auth.signOut();
+  window.location.href = 'login.html';
+}
+</script>
 <script src="app.js"></script>
 </body>
 </html>

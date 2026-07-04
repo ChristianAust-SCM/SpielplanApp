@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login · Spielplan-App</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:#0D1B2A; --navy2:#152232; --navy3:#1e3048;
+      --orange:#D4620A; --orange2:#F07830;
+      --teal:#1D9E75; --white:#F7F9FF; --muted:#8996B4;
+      --line:rgba(255,255,255,0.10); --radius:10px;
+    }
+    body {
+      font-family: Calibri,'Segoe UI',system-ui,sans-serif;
+      background:var(--navy); color:var(--white);
+      min-height:100vh; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; padding:24px;
+    }
+    .brand { text-align:center; margin-bottom:32px; }
+    .brand-name { font-family:'Bahnschrift SemiBold','Segoe UI Semibold',sans-serif; font-size:22px; color:var(--orange2); }
+    .brand-sub { font-size:13px; color:var(--muted); margin-top:4px; }
+
+    .card {
+      width:100%; max-width:400px;
+      background:var(--navy2); border:1px solid var(--line);
+      border-radius:16px; overflow:hidden;
+    }
+    .card-header {
+      background:var(--navy3); padding:20px 24px;
+      border-bottom:1px solid var(--line);
+    }
+    .card-header h1 {
+      font-family:'Bahnschrift SemiBold',sans-serif;
+      font-size:18px; color:var(--white);
+    }
+    .card-header p { font-size:13px; color:var(--muted); margin-top:4px; }
+    .card-body { padding:24px; }
+
+    .field { margin-bottom:18px; }
+    .field label {
+      display:block; font-size:11px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.09em;
+      color:var(--muted); margin-bottom:8px;
+    }
+    .field input {
+      width:100%; padding:11px 14px;
+      background:var(--navy3); border:1px solid var(--line);
+      border-radius:var(--radius); color:var(--white);
+      font-family:Calibri,sans-serif; font-size:15px;
+      outline:none; transition:border-color 140ms;
+    }
+    .field input:focus { border-color:var(--teal); }
+    .field input::placeholder { color:var(--muted); }
+
+    .btn-login {
+      width:100%; padding:13px;
+      background:var(--orange); color:#fff; border:none;
+      border-radius:var(--radius);
+      font-family:'Bahnschrift SemiBold',Calibri,sans-serif;
+      font-size:16px; cursor:pointer; transition:opacity 160ms;
+      margin-top:4px;
+    }
+    .btn-login:hover:not(:disabled) { opacity:0.88; }
+    .btn-login:disabled { opacity:0.4; cursor:not-allowed; }
+
+    .error-msg {
+      background:rgba(226,75,74,0.12); border:1px solid rgba(226,75,74,0.3);
+      border-radius:8px; padding:12px 14px; font-size:13px;
+      color:#F08080; margin-top:14px;
+    }
+    .footer { font-size:12px; color:var(--muted); text-align:center; margin-top:24px; }
+  </style>
+</head>
+<body>
+
+<div class="brand">
+  <div class="brand-name">Spielplan-App · FC Strass e.V.</div>
+  <div class="brand-sub">Mannschaftsführer-Bereich</div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h1>Anmelden</h1>
+    <p>Zugang nur für Mannschaftsführer und Admins</p>
+  </div>
+  <div class="card-body">
+    <div class="field">
+      <label>E-Mail</label>
+      <input type="email" id="email" placeholder="deine@email.de" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Passwort</label>
+      <input type="password" id="passwort" placeholder="••••••••" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter') anmelden()">
+    </div>
+    <button class="btn-login" onclick="anmelden()" id="btn-login">Anmelden</button>
+    <div id="error-box"></div>
+  </div>
+</div>
+
+<div class="footer">Probleme beim Login? Wende dich an Christian Aust.</div>
+
+<script>
+const SUPABASE_URL  = 'https://nwutgxjnverlvmkrpiep.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_09tn0DY3wswcIVQ-mN1S8A_znKWQXaF';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// Bereits eingeloggt? Direkt weiterleiten
+sb.auth.getSession().then(function(res) {
+  if (res.data.session) {
+    window.location.href = 'index.html';
+  }
+});
+
+async function anmelden() {
+  const email    = document.getElementById('email').value.trim();
+  const passwort = document.getElementById('passwort').value;
+  const btn      = document.getElementById('btn-login');
+
+  if (!email || !passwort) {
+    zeigeFehler('Bitte E-Mail und Passwort eingeben.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Anmelden...';
+  document.getElementById('error-box').innerHTML = '';
+
+  const { error } = await sb.auth.signInWithPassword({ email, password: passwort });
+
+  if (error) {
+    zeigeFehler('Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.');
+    btn.disabled = false;
+    btn.textContent = 'Anmelden';
+    return;
+  }
+
+  window.location.href = 'index.html';
+}
+
+function zeigeFehler(msg) {
+  document.getElementById('error-box').innerHTML =
+    '<div class="error-msg">' + msg + '</div>';
+}
+</script>
+</body>
+</html>
