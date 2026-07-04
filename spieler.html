@@ -181,11 +181,11 @@ let nichtKaderModus = false;
 })();
 
 function renderFormular(spieler) {
-  const optionen = spieler.map(s =>
-    `<option value="${s.id}">${s.name}</option>`
-  ).join('');
-
-  document.getElementById('card-body').innerHTML = `
+  const optionen = spieler.map(s => {
+    const parts = s.name.split(",");
+    const anzeige = parts.length === 2 ? parts[1].trim() + " " + parts[0].trim() : s.name;
+    return `<option value="${s.id}">${anzeige}</option>`;
+  }).join("");
     <div class="field">
       <label>Dein Name</label>
       <select class="spieler-select" id="spieler-select" onchange="pruefeFormular()">
@@ -197,7 +197,7 @@ function renderFormular(spieler) {
 
     <div class="field hidden" id="freitext-feld">
       <label>Name eintragen</label>
-      <input type="text" class="freitext-input" id="freitext" placeholder="Vorname Nachname" oninput="pruefeFormular()">
+      <input type="text" class="freitext-input" id="freitext" placeholder="Name eingeben" oninput="pruefeFormular()">
     </div>
 
     <div class="field">
