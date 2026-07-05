@@ -12,6 +12,7 @@ let aktiveMannschaft = null;
 let alleTermine      = [];
 let alleVerfueg      = [];
 let alleSpieler      = [];
+let alleAlternativtermine = [];
 let istAdmin         = false;
 
 async function init() {
@@ -107,11 +108,15 @@ async function ladeMannschaft(mannschaftId) {
 
   if (alleTermine.length > 0) {
     const ids = alleTermine.map(t => t.id);
-    const { data: vd } = await sb.from('verfuegbarkeiten')
-      .select('*').in('spieltermin_id', ids);
-    alleVerfueg = vd || [];
+    const [verfRes, altRes] = await Promise.all([
+      sb.from('verfuegbarkeiten').select('*').in('spieltermin_id', ids),
+      sb.from('alternativtermine').select('*').in('spieltermin_id', ids).order('datum')
+    ]);
+    alleVerfueg = verfRes.data || [];
+    alleAlternativtermine = altRes.data || [];
   } else {
     alleVerfueg = [];
+    alleAlternativtermine = [];
   }
 
   renderStats();
@@ -198,21 +203,73 @@ function renderTabelle() {
     const waText    = 'Hallo zusammen,\nbitte meldet eure Verfügbarkeit für unser Spiel:\n\n🏓 ' + heimAusw + ' gegen ' + t.gegner + '\n📅 ' + datumLang + (uhr ? ' · ' + uhr : '') + '\n\n👉 ' + abfrageLink + '\n\nBitte bis Mittwoch antworten. Danke!\n– ' + mfName;
 
     const statusBadge = t.status === 'Verschoben'
-      ? '<span style="color:#F0B429;font-size:11px;font-weight:700"> · VERSCHOBEN</span>' : '';
+      ? '<span style="color:#F0B429;font-size:11px;font-weight:700"> · ALTERNATIVTERMIN</span>'
+      : t.status === 'Verschiebung nötig'
+      ? '<span style="color:#F07830;font-size:11px;font-weight:700"> · VERSCHIEBUNG NÖTIG</span>'
+      : '';
 
-    return '<tr>' +
-      '<td><div class="datum-block"><div class="datum-main">' + wt + ', ' + dt + statusBadge + '</div><div class="datum-sub">' + uhr + '</div></div></td>' +
-      '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
-      '<td style="font-weight:700">' + t.gegner + '</td>' +
-      '<td><span class="ampel ' + kl + '"><span class="ampel-dot"></span>' + ampelLabels[kl] + ' · ' + txt + '</span></td>' +
-      '<td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
-        '<a class="btn-abfrage" href="' + abfrageLink + '" target="_blank">🔗 Link öffnen</a>' +
+    // Alternativtermine für diesen Spieltermin
+    const altTermine = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
+    const altInfo = altTermine.length > 0
+      ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">' +
+          altTermine.map(function(at, i) {
+            const ad  = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
+            const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) : '';
+            // Abstimmungen für diesen Alternativtermin aus alleVerfueg
+            const altVerfueg = alleVerfueg.filter(v => v.alternativtermin_id === at.id);
+            const altJa   = altVerfueg.filter(v => v.antwort === 'Ja').length;
+            const altViel = altVerfueg.filter(v => v.antwort === 'Vielleicht').length;
+            const altNein = altVerfueg.filter(v => v.antwort === 'Nein').length;
+            const min = aktiveMannschaft?.min_spieler || 6;
+            const altFarbe = altJa >= min ? '#4FD4A8' : altJa >= 4 ? '#F0C060' : '#8996B4';
+            return '<span style="font-size:12px;color:' + altFarbe + '">' +
+              '↔ Alt.' + (i+1) + ': ' + ad + (auhr?' '+auhr:'') +
+              ' · ' + altJa + ' Ja · ' + altViel + ' Vielleicht · ' + altNein + ' Nein' +
+              (altVerfueg.length === 0 ? ' · Noch keine Abstimmung' : '') +
+            '</span>';
+          }).join('') +
+        '</div>'
+      : '';
+
+    // Ist dieser Termin im Alternativtermin-Modus?
+    const istAlternativ = t.status === 'Verschoben' || t.status === 'Verschiebung nötig';
+    const altTermine    = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
+    const rowStyle      = istAlternativ ? 'opacity:0.45;' : '';
+
+    // Datums-Block: bei Alternativtermin die Alt-Termine anzeigen
+    let datumBlock;
+    if (istAlternativ && altTermine.length > 0) {
+      const altDaten = altTermine.map(function(at, i) {
+        const ad  = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'2-digit' });
+        const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) : '';
+        return '<div style="font-size:12px;color:#F07830;font-weight:700">↔ Alt.' + (i+1) + ': ' + ad + (auhr?' '+auhr+' Uhr':'') + '</div>';
+      }).join('');
+      datumBlock = '<div class="datum-block">' +
+        '<div class="datum-main" style="color:#8996B4;text-decoration:line-through">' + wt + ', ' + dt + '</div>' +
+        altDaten +
+      '</div>';
+    } else {
+      datumBlock = '<div class="datum-block"><div class="datum-main">' + wt + ', ' + dt + statusBadge + '</div><div class="datum-sub">' + uhr + '</div></div>';
+    }
+
+    // Aktions-Buttons: bei Alternativtermin nur Verschiebungs-Button aktiv
+    const aktionButtons = istAlternativ
+      ? '<button class="btn-verschiebung aktiv" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')">' +
+          (t.status === 'Verschiebung nötig' ? '⚠️ Alternativtermin läuft' : '↔️ Alternativtermin') +
+        '</button>'
+      : '<a class="btn-abfrage" href="' + abfrageLink + '" target="_blank">🔗 Link öffnen</a>' +
         '<button class="btn-wa" onclick="kopierenWA(this, \'' + waText.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')">💬 Kopie für WhatsApp</button>' +
         '<button class="btn-detail" onclick="zeigeDetail(\'' + t.id + '\')">👥 Wer?</button>' +
         '<button class="btn-verschiebung' + (t.status === 'Verschiebung nötig' ? ' aktiv' : '') + '" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')">' +
-          (t.status === 'Verschiebung nötig' ? '⚠️ Verschoben nötig' : '↔️ Verschiebung') +
-        '</button>' +
-      '</td>' +
+          (t.status === 'Verschiebung nötig' ? '⚠️ Alternativtermin läuft' : '↔️ Alternativtermin') +
+        '</button>';
+
+    return '<tr style="' + rowStyle + '">' +
+      '<td>' + datumBlock + '</td>' +
+      '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
+      '<td style="font-weight:700">' + t.gegner + '</td>' +
+      '<td><span class="ampel ' + kl + '"><span class="ampel-dot"></span>' + ampelLabels[kl] + ' · ' + txt + '</span>' + altInfo + '</td>' +
+      '<td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + aktionButtons + '</td>' +
     '</tr>';
   }).join('');
 
