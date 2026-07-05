@@ -229,7 +229,7 @@ function renderTabelle() {
       ? '<span style="color:#F07830;font-size:11px;font-weight:700"> · VERSCHIEBUNG NÖTIG</span>'
       : '';
 
-    // Alternativtermine für diesen Spieltermin – Badges pro Alt-Termin
+    // Alternativtermine – Badges pro Alt-Termin
     const altTermineInfo = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
     const altVerfuegbarkeit = altTermineInfo.length > 0
       ? '<div style="display:flex;flex-direction:column;gap:6px">' +
@@ -245,19 +245,12 @@ function renderTabelle() {
               '<div style="font-size:11px;color:#8996B4;margin-bottom:3px;font-weight:700">Alt.' + (i+1) + ': ' + ad + (auhr?' · '+auhr:'') + '</div>' +
               (hatAbstimmung
                 ? '<div style="display:flex;gap:3px;flex-wrap:wrap">' +
-                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041">' +
-                      '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span>' + altJa + ' Ja' +
-                    '</span>' +
-                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806">' +
-                      '<span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block"></span>' + altViel + ' Vllt.' +
-                    '</span>' +
-                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F">' +
-                      '<span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>' + altNein + ' Nein' +
-                    '</span>' +
+                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041"><span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span>' + altJa + ' Ja</span>' +
+                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806"><span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block"></span>' + altViel + ' Vllt.</span>' +
+                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F"><span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>' + altNein + ' Nein</span>' +
                   '</div>'
                 : '<span style="font-size:12px;color:#8996B4;font-style:italic">Noch keine Abstimmung</span>'
-              ) +
-            '</div>';
+              ) + '</div>';
           }).join('<div style="height:1px;background:rgba(255,255,255,0.07);margin:2px 0"></div>') +
         '</div>'
       : null;
@@ -298,15 +291,9 @@ function renderTabelle() {
         ? (altVerfuegbarkeit || '<span style="font-size:13px;color:#8996B4;">–</span>')
         : (txt
             ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
-                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041">' +
-                  '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span>' + txt.ja + ' Ja' +
-                '</span>' +
-                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806">' +
-                  '<span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block"></span>' + txt.vielleicht + ' Vllt.' +
-                '</span>' +
-                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F">' +
-                  '<span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>' + txt.nein + ' Nein' +
-                '</span>' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041"><span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span>' + txt.ja + ' Ja</span>' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806"><span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block"></span>' + txt.vielleicht + ' Vllt.</span>' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F"><span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>' + txt.nein + ' Nein</span>' +
               '</div>'
             : '<span style="font-size:13px;color:#8996B4;">–</span>')
       ) + '</td>' +
@@ -317,24 +304,11 @@ function renderTabelle() {
             const eindeutig = [...new Set(alleAltStimmen.map(v => v.spieler_id))].length;
             const kader = alleSpieler.length || 6;
             return eindeutig > 0
-              ? '<div style="line-height:1.5">' +
-                  '<div style="font-size:15px;font-weight:700;color:#F7F9FF">' + eindeutig + ' / ' + kader + '</div>' +
-                  '<div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;background:rgba(212,98,10,0.15);color:#F07830">abgestimmt</div>' +
-                '</div>'
+              ? '<div style="line-height:1.5"><div style="font-size:15px;font-weight:700;color:#F7F9FF">' + eindeutig + ' / ' + kader + '</div><div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;background:rgba(212,98,10,0.15);color:#F07830">abgestimmt</div></div>'
               : '<span style="font-size:12px;color:var(--muted)">–</span>';
           })()
         : (rm
-            ? '<button onclick="zeigeFehlende(\'' + t.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
-                '<div style="line-height:1.5">' +
-                  '<div style="font-size:15px;font-weight:700;color:' + (rm.fehlen === 0 ? '#4FD4A8' : '#F7F9FF') + '">' + rm.gesamt + ' / ' + rm.kader + '</div>' +
-                  '<div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;' +
-                    (rm.fehlen === 0
-                      ? 'background:rgba(29,158,117,0.15);color:#4FD4A8'
-                      : 'background:rgba(226,75,74,0.15);color:#F08080') + '">' +
-                    (rm.fehlen === 0 ? '✓ alle' : rm.fehlen + ' fehlen') +
-                  '</div>' +
-                '</div>' +
-              '</button>'
+            ? '<button onclick="zeigeFehlende(\'' + t.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0"><div style="line-height:1.5"><div style="font-size:15px;font-weight:700;color:' + (rm.fehlen === 0 ? '#4FD4A8' : '#F7F9FF') + '">' + rm.gesamt + ' / ' + rm.kader + '</div><div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;' + (rm.fehlen === 0 ? 'background:rgba(29,158,117,0.15);color:#4FD4A8' : 'background:rgba(226,75,74,0.15);color:#F08080') + '">' + (rm.fehlen === 0 ? '✓ alle' : rm.fehlen + ' fehlen') + '</div></div></button>'
             : '<span style="font-size:12px;color:var(--muted)">–</span>')
       ) + '</td>' +
       '<td style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap">' + aktionButtons + '</td>' +
@@ -597,10 +571,15 @@ async function zeigeAdminVerschiebungsModal(termin) {
             '<span style="background:rgba(240,180,41,0.12);color:#F0C060;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._vielleicht + ' Vielleicht</span>' +
             '<span style="background:rgba(226,75,74,0.12);color:#F08080;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._nein + ' Nein</span>' +
           '</div>' +
-          '<button onclick="bestaetigeAlternativtermin(\'' + termin.id + '\',\'' + at.id + '\',\'' + at.datum + '\',\'' + (at.uhrzeit||'') + '\')" ' +
-            'style="width:100%;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">' +
-            '✓ Diesen Termin übernehmen – Abstimmung wird als Verfügbarkeit gesetzt' +
-          '</button>' +
+          (at._ja >= min
+            ? '<button onclick="bestaetigeAlternativtermin(\'' + termin.id + '\',\'' + at.id + '\',\'' + at.datum + '\',\'' + (at.uhrzeit||'') + '\')" ' +
+                'style="width:100%;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">' +
+                '✓ Diesen Termin übernehmen – Abstimmung wird als Verfügbarkeit gesetzt' +
+              '</button>'
+            : '<div style="width:100%;padding:10px;background:rgba(137,150,180,0.08);border:1px solid rgba(137,150,180,0.2);border-radius:8px;font-size:13px;color:#8996B4;text-align:center">' +
+                '⏳ Noch nicht genug Zusagen (' + at._ja + ' / ' + min + ' benötigt)' +
+              '</div>'
+          ) +
         '</div>';
       }).join('')
     : '<div style="font-size:13px;color:#8996B4;font-style:italic">Noch keine Alternativtermine vom MF eingetragen.</div>';
