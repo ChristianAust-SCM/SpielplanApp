@@ -167,12 +167,16 @@ function ampelKlasse(terminId) {
 }
 
 function ampelText(terminId) {
-  const hat = alleVerfueg.some(v => v.spieltermin_id === terminId);
+  const hat = alleVerfueg.some(v => v.spieltermin_id === terminId && v.alternativtermin_id === null);
   if (!hat) return 'Keine Abfrage';
   const ja         = zaehleAntworten(terminId, 'Ja');
   const nein       = zaehleAntworten(terminId, 'Nein');
   const vielleicht = zaehleAntworten(terminId, 'Vielleicht');
-  return ja + ' Ja · ' + vielleicht + ' Vielleicht · ' + nein + ' Nein';
+  const gesamt     = ja + nein + vielleicht;
+  const kadergrösse = alleSpieler.length || (aktiveMannschaft?.min_spieler || 6);
+  const fehlen     = Math.max(0, kadergrösse - gesamt);
+  const fortschritt = gesamt + ' von ' + kadergrösse + ' abgestimmt' + (fehlen > 0 ? ' · ' + fehlen + ' fehlen' : ' · alle ✓');
+  return ja + ' Ja · ' + vielleicht + ' Vielleicht · ' + nein + ' Nein · ' + fortschritt;
 }
 
 // ============================================================
