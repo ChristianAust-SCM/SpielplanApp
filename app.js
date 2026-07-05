@@ -235,10 +235,10 @@ function renderTabelle() {
             const altNein = altVerfueg.filter(v => v.antwort === 'Nein').length;
             const min = aktiveMannschaft?.min_spieler || 6;
             const altFarbe = altJa >= min ? '#4FD4A8' : altJa >= 4 ? '#F0C060' : '#8996B4';
-            return '<span style="font-size:12px;color:' + altFarbe + '">' +
+            return '<span style="font-size:12px;color:' + altFarbe + ';display:block">' +
               '↔ Alt.' + (i+1) + ': ' + ad + (auhr?' '+auhr:'') +
-              ' · ' + altJa + ' Ja · ' + altViel + ' Vielleicht · ' + altNein + ' Nein' +
-              (altVerfueg.length === 0 ? ' · Noch keine Abstimmung' : '') +
+              ' · ' + altJa + ' Ja' +
+              (altVerfueg.length === 0 ? ' · offen' : '') +
             '</span>';
           }).join('') +
         '</div>'
@@ -288,10 +288,7 @@ function renderTabelle() {
               '<span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block;"></span>' + txt.nein + ' Nein' +
             '</span>' +
           '</div>'
-        : '<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;background:rgba(137,150,180,0.12)">' +
-            '<span style="width:6px;height:6px;border-radius:50%;background:#8996B4;display:inline-block;"></span>' +
-            '<span style="font-size:12px;color:#8996B4;">Keine Abfrage</span>' +
-          '</div>') + altInfo + '</td>' +
+        : '<span style="font-size:13px;color:#8996B4;">–</span>') + altInfo + '</td>' +
       '<td>' + (rm
         ? '<button onclick="zeigeFehlende(\'' + t.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
             '<div style="line-height:1.5">' +
@@ -305,7 +302,7 @@ function renderTabelle() {
             '</div>' +
           '</button>'
         : '<span style="font-size:12px;color:var(--muted)">–</span>') + '</td>' +
-      '<td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + aktionButtons + '</td>' +
+      '<td style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap">' + aktionButtons + '</td>' +
     '</tr>';
   }).join('');
 
