@@ -172,11 +172,19 @@ function ampelText(terminId) {
   const ja         = zaehleAntworten(terminId, 'Ja');
   const nein       = zaehleAntworten(terminId, 'Nein');
   const vielleicht = zaehleAntworten(terminId, 'Vielleicht');
+  return ja + ' Ja · ' + vielleicht + ' Vielleicht · ' + nein + ' Nein';
+}
+
+function rueckmeldungText(terminId) {
+  const hat = alleVerfueg.some(v => v.spieltermin_id === terminId && v.alternativtermin_id === null);
+  if (!hat) return null;
+  const ja         = zaehleAntworten(terminId, 'Ja');
+  const nein       = zaehleAntworten(terminId, 'Nein');
+  const vielleicht = zaehleAntworten(terminId, 'Vielleicht');
   const gesamt     = ja + nein + vielleicht;
-  const kadergrösse = alleSpieler.length || (aktiveMannschaft?.min_spieler || 6);
-  const fehlen     = Math.max(0, kadergrösse - gesamt);
-  const fortschritt = gesamt + ' von ' + kadergrösse + ' abgestimmt' + (fehlen > 0 ? ' · ' + fehlen + ' fehlen' : ' · alle ✓');
-  return ja + ' Ja · ' + vielleicht + ' Vielleicht · ' + nein + ' Nein · ' + fortschritt;
+  const kader      = alleSpieler.length || (aktiveMannschaft?.min_spieler || 6);
+  const fehlen     = Math.max(0, kader - gesamt);
+  return { gesamt, kader, fehlen };
 }
 
 // ============================================================
@@ -199,6 +207,7 @@ function renderTabelle() {
     const uhr = t.uhrzeit ? t.uhrzeit.slice(0,5) + ' Uhr' : '';
     const kl  = ampelKlasse(t.id);
     const txt = ampelText(t.id);
+    const rm  = rueckmeldungText(t.id);
     const abfrageLink = baseUrl + 'spieler.html?token=' + t.abfrage_token;
 
     const datumLang = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
@@ -263,7 +272,6 @@ function renderTabelle() {
         '</button>'
       : '<a class="btn-abfrage" href="' + abfrageLink + '" target="_blank">🔗 Link öffnen</a>' +
         '<button class="btn-wa" onclick="kopierenWA(this, \'' + waText.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')">💬 Kopie für WhatsApp</button>' +
-        '<button class="btn-detail" onclick="zeigeDetail(\'' + t.id + '\')">👥 Wer?</button>' +
         '<button class="btn-verschiebung' + (t.status === 'Verschiebung nötig' ? ' aktiv' : '') + '" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')">' +
           (t.status === 'Verschiebung nötig' ? '⚠️ Alternativtermin läuft' : '↔️ Alternativtermin') +
         '</button>';
@@ -273,6 +281,19 @@ function renderTabelle() {
       '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
       '<td style="font-weight:700">' + t.gegner + '</td>' +
       '<td><span class="ampel ' + kl + '"><span class="ampel-dot"></span>' + ampelLabels[kl] + ' · ' + txt + '</span>' + altInfo + '</td>' +
+      '<td>' + (rm
+        ? '<button onclick="zeigeFehlende(\'' + t.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
+            '<div style="line-height:1.5">' +
+              '<div style="font-size:15px;font-weight:700;color:' + (rm.fehlen === 0 ? '#4FD4A8' : '#F7F9FF') + '">' + rm.gesamt + ' / ' + rm.kader + '</div>' +
+              '<div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;' +
+                (rm.fehlen === 0
+                  ? 'background:rgba(29,158,117,0.15);color:#4FD4A8'
+                  : 'background:rgba(226,75,74,0.15);color:#F08080') + '">' +
+                (rm.fehlen === 0 ? '✓ alle' : rm.fehlen + ' fehlen') +
+              '</div>' +
+            '</div>' +
+          '</button>'
+        : '<span style="font-size:12px;color:var(--muted)">–</span>') + '</td>' +
       '<td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + aktionButtons + '</td>' +
     '</tr>';
   }).join('');
@@ -280,7 +301,7 @@ function renderTabelle() {
   document.getElementById('table-container').innerHTML =
     '<table class="spielplan-table">' +
       '<thead><tr>' +
-        '<th>Datum</th><th>H/A</th><th>Gegner</th><th>Verfügbarkeit</th><th>Aktion</th>' +
+        '<th>Datum</th><th>H/A</th><th>Gegner</th><th>Verfügbarkeit</th><th>Rückmeldung</th><th>Aktion</th>' +
       '</tr></thead>' +
       '<tbody>' + rows + '</tbody>' +
     '</table>';
@@ -606,6 +627,69 @@ async function _verschiebungFertigstellen(terminId, datum, uhrzeit) {
   document.querySelector('[style*="fixed"]')?.remove();
   await ladeMannschaft(aktiveMannschaft.id);
   alert('✓ Termin bestätigt. Der MF kann jetzt den neuen WhatsApp-Link schicken.');
+}
+
+// ============================================================
+// Fehlende Rückmeldungen anzeigen
+// ============================================================
+function zeigeFehlende(terminId) {
+  const termin = alleTermine.find(t => t.id === terminId);
+  if (!termin) return;
+
+  const hatGeantwortet = alleVerfueg
+    .filter(v => v.spieltermin_id === terminId && v.alternativtermin_id === null)
+    .map(v => v.spieler_id);
+
+  const nochNicht = alleSpieler.filter(s => !hatGeantwortet.includes(s.id));
+  const haben     = alleSpieler.filter(s => hatGeantwortet.includes(s.id));
+
+  function vorname(n) { const p = n.split(','); return p.length===2 ? p[1].trim()+' '+p[0].trim() : n; }
+
+  const d = new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit' });
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px';
+
+  const fehlenHtml = nochNicht.length === 0
+    ? '<div style="font-size:13px;color:#4FD4A8;padding:8px 0">✓ Alle haben geantwortet!</div>'
+    : nochNicht.map(s =>
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#1e3048;border-radius:6px;margin-bottom:6px">' +
+          '<span style="font-size:13px;color:#F7F9FF">' + vorname(s.name) + '</span>' +
+          '<span style="font-size:11px;color:#F08080;font-weight:700">Keine Antwort</span>' +
+        '</div>'
+      ).join('');
+
+  const habenHtml = haben.map(s => {
+    const v = alleVerfueg.find(v => v.spieltermin_id === terminId && v.spieler_id === s.id && v.alternativtermin_id === null);
+    const farbe = v?.antwort === 'Ja' ? '#4FD4A8' : v?.antwort === 'Nein' ? '#F08080' : '#F0C060';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#1e3048;border-radius:6px;margin-bottom:6px">' +
+      '<span style="font-size:13px;color:#F7F9FF">' + vorname(s.name) + '</span>' +
+      '<span style="font-size:11px;font-weight:700;color:' + farbe + '">' + (v?.antwort || '–') + '</span>' +
+    '</div>';
+  }).join('');
+
+  modal.innerHTML =
+    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:460px;width:100%;max-height:85vh;overflow-y:auto">' +
+      '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232">' +
+        '<div>' +
+          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:#F07830">Rückmeldungen · ' + (termin.heim?'Heim':'Auswärts') + ' gegen ' + termin.gegner + '</div>' +
+          '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + d + '</div>' +
+        '</div>' +
+        '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
+      '</div>' +
+      '<div style="padding:16px 20px">' +
+        (nochNicht.length > 0
+          ? '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#F08080;margin-bottom:8px">Noch keine Antwort (' + nochNicht.length + ')</div>' +
+            fehlenHtml +
+            '<div style="height:1px;background:rgba(255,255,255,0.08);margin:14px 0"></div>'
+          : '') +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Haben geantwortet (' + haben.length + ')</div>' +
+        habenHtml +
+      '</div>' +
+    '</div>';
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
 }
 
 // ============================================================
