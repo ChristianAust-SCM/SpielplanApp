@@ -221,28 +221,42 @@ function renderTabelle() {
       ? '<span style="color:#F07830;font-size:11px;font-weight:700"> · VERSCHIEBUNG NÖTIG</span>'
       : '';
 
-    // Alternativtermine für diesen Spieltermin (Ampel-Info)
+    // Alternativtermine für diesen Spieltermin – saubere Badge-Darstellung
     const altTermineInfo = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
-    const altInfo = altTermineInfo.length > 0
-      ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">' +
+
+    // Verfügbarkeits-Spalte bei Alternativtermin: Badges pro Alt-Termin
+    const altVerfuegbarkeit = altTermineInfo.length > 0
+      ? '<div style="display:flex;flex-direction:column;gap:6px">' +
           altTermineInfo.map(function(at, i) {
-            const ad  = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
-            const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) : '';
-            // Abstimmungen für diesen Alternativtermin aus alleVerfueg
+            const ad   = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
+            const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) + ' Uhr' : '';
             const altVerfueg = alleVerfueg.filter(v => v.alternativtermin_id === at.id);
             const altJa   = altVerfueg.filter(v => v.antwort === 'Ja').length;
             const altViel = altVerfueg.filter(v => v.antwort === 'Vielleicht').length;
             const altNein = altVerfueg.filter(v => v.antwort === 'Nein').length;
+            const hatAbstimmung = altVerfueg.length > 0;
             const min = aktiveMannschaft?.min_spieler || 6;
-            const altFarbe = altJa >= min ? '#4FD4A8' : altJa >= 4 ? '#F0C060' : '#8996B4';
-            return '<span style="font-size:12px;color:' + altFarbe + ';display:block">' +
-              '↔ Alt.' + (i+1) + ': ' + ad + (auhr?' '+auhr:'') +
-              ' · ' + altJa + ' Ja' +
-              (altVerfueg.length === 0 ? ' · offen' : '') +
-            '</span>';
-          }).join('') +
+            const labelFarbe = altJa >= min ? '#4FD4A8' : altJa >= 3 ? '#F0C060' : '#8996B4';
+            return '<div>' +
+              '<div style="font-size:11px;color:#8996B4;margin-bottom:3px;font-weight:700">Alt.' + (i+1) + ': ' + ad + (auhr?' · '+auhr:'') + '</div>' +
+              (hatAbstimmung
+                ? '<div style="display:flex;gap:3px;flex-wrap:wrap">' +
+                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041">' +
+                      '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span>' + altJa + ' Ja' +
+                    '</span>' +
+                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806">' +
+                      '<span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block"></span>' + altViel + ' Vllt.' +
+                    '</span>' +
+                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F">' +
+                      '<span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>' + altNein + ' Nein' +
+                    '</span>' +
+                  '</div>'
+                : '<span style="font-size:12px;color:#8996B4;font-style:italic">Noch keine Abstimmung</span>'
+              ) +
+            '</div>';
+          }).join('<div style="height:1px;background:rgba(255,255,255,0.07);margin:2px 0"></div>') +
         '</div>'
-      : '';
+      : null;
 
     // Ist dieser Termin im Alternativtermin-Modus?
     const istAlternativ = t.status === 'Verschoben' || t.status === 'Verschiebung nötig';
@@ -276,32 +290,50 @@ function renderTabelle() {
       '<td>' + datumBlock + '</td>' +
       '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
       '<td style="font-weight:700">' + t.gegner + '</td>' +
-      '<td>' + (txt
-        ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">' +
-            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041">' +
-              '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block;"></span>' + txt.ja + ' Ja' +
-            '</span>' +
-            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806">' +
-              '<span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block;"></span>' + txt.vielleicht + ' Vllt.' +
-            '</span>' +
-            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F">' +
-              '<span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block;"></span>' + txt.nein + ' Nein' +
-            '</span>' +
-          '</div>'
-        : '<span style="font-size:13px;color:#8996B4;">–</span>') + altInfo + '</td>' +
-      '<td>' + (rm
-        ? '<button onclick="zeigeFehlende(\'' + t.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
-            '<div style="line-height:1.5">' +
-              '<div style="font-size:15px;font-weight:700;color:' + (rm.fehlen === 0 ? '#4FD4A8' : '#F7F9FF') + '">' + rm.gesamt + ' / ' + rm.kader + '</div>' +
-              '<div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;' +
-                (rm.fehlen === 0
-                  ? 'background:rgba(29,158,117,0.15);color:#4FD4A8'
-                  : 'background:rgba(226,75,74,0.15);color:#F08080') + '">' +
-                (rm.fehlen === 0 ? '✓ alle' : rm.fehlen + ' fehlen') +
-              '</div>' +
-            '</div>' +
-          '</button>'
-        : '<span style="font-size:12px;color:var(--muted)">–</span>') + '</td>' +
+      '<td>' + (istAlternativ
+        ? (altVerfuegbarkeit || '<span style="font-size:13px;color:#8996B4;">–</span>')
+        : (txt
+            ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041">' +
+                  '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span>' + txt.ja + ' Ja' +
+                '</span>' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806">' +
+                  '<span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block"></span>' + txt.vielleicht + ' Vllt.' +
+                '</span>' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F">' +
+                  '<span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>' + txt.nein + ' Nein' +
+                '</span>' +
+              '</div>'
+            : '<span style="font-size:13px;color:#8996B4;">–</span>')
+      ) + '</td>' +
+      '<td>' + (istAlternativ
+        ? (function() {
+            // Gesamtzahl Abstimmungen über alle Alternativtermine
+            const altIds = altTermineInfo.map(a => a.id);
+            const alleAltStimmen = alleVerfueg.filter(v => altIds.includes(v.alternativtermin_id));
+            const eindeutig = [...new Set(alleAltStimmen.map(v => v.spieler_id))].length;
+            const kader = alleSpieler.length || 6;
+            return eindeutig > 0
+              ? '<div style="line-height:1.5">' +
+                  '<div style="font-size:15px;font-weight:700;color:#F7F9FF">' + eindeutig + ' / ' + kader + '</div>' +
+                  '<div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;background:rgba(212,98,10,0.15);color:#F07830">abgestimmt</div>' +
+                '</div>'
+              : '<span style="font-size:12px;color:var(--muted)">–</span>';
+          })()
+        : (rm
+            ? '<button onclick="zeigeFehlende(\'' + t.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
+                '<div style="line-height:1.5">' +
+                  '<div style="font-size:15px;font-weight:700;color:' + (rm.fehlen === 0 ? '#4FD4A8' : '#F7F9FF') + '">' + rm.gesamt + ' / ' + rm.kader + '</div>' +
+                  '<div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;' +
+                    (rm.fehlen === 0
+                      ? 'background:rgba(29,158,117,0.15);color:#4FD4A8'
+                      : 'background:rgba(226,75,74,0.15);color:#F08080') + '">' +
+                    (rm.fehlen === 0 ? '✓ alle' : rm.fehlen + ' fehlen') +
+                  '</div>' +
+                '</div>' +
+              '</button>'
+            : '<span style="font-size:12px;color:var(--muted)">–</span>')
+      ) + '</td>' +
       '<td style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap">' + aktionButtons + '</td>' +
     '</tr>';
   }).join('');
