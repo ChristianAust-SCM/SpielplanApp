@@ -129,40 +129,78 @@ function vorname(dbName) {
 }
 
 async function laden() {
-  const params = new URLSearchParams(window.location.search);
-  const token  = params.get('token');
-  if (!token) { zeigeError('Ungültiger Link – kein Token gefunden.'); return; }
+  const params   = new URLSearchParams(window.location.search);
+  const token    = params.get('token');
+  const altToken = params.get('alt');
 
-  const res = await sb.from('spieltermine')
-    .select('*, mannschaften(id, name, liga)')
-    .eq('abfrage_token', token)
-    .single();
+  if (!token && !altToken) { zeigeError('Ungültiger Link – kein Token gefunden.'); return; }
 
-  if (res.error || !res.data) {
-    zeigeError('Spieltermin nicht gefunden. Bitte neuen Link beim Mannschaftsführer anfordern.');
-    return;
+  let termin, altTerminId = null;
+
+  if (altToken) {
+    // Alternativtermin-Link
+    const res = await sb.from('alternativtermine')
+      .select('*, spieltermine(id, gegner, heim, mannschaften(id, name, liga))')
+      .eq('abfrage_token', altToken)
+      .single();
+
+    if (res.error || !res.data) {
+      zeigeError('Alternativtermin nicht gefunden. Bitte neuen Link beim Mannschaftsführer anfordern.');
+      return;
+    }
+
+    const alt = res.data;
+    altTerminId  = alt.id;
+    terminId     = alt.spieltermine.id;
+    mannschaftId = alt.spieltermine.mannschaften.id;
+
+    const d   = new Date(alt.datum);
+    const dt  = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+    const uhr = alt.uhrzeit ? alt.uhrzeit.slice(0,5) + ' Uhr' : '';
+
+    document.getElementById('spiel-titel').textContent =
+      '📅 Ausweichtermin: ' + (alt.spieltermine.heim ? 'Heimspiel' : 'Auswärtsspiel') + ' gegen ' + alt.spieltermine.gegner;
+    document.getElementById('spiel-meta').innerHTML =
+      alt.spieltermine.mannschaften.name + ' &middot; ' + alt.spieltermine.mannschaften.liga +
+      '<br>' + dt + (uhr ? ' &middot; ' + uhr : '') +
+      '<br><span style="color:#F07830;font-weight:700">Bitte abstimmen ob ihr an diesem Ausweichtermin spielen könnt</span>';
+
+  } else {
+    // Normaler Spieltermin-Link
+    const res = await sb.from('spieltermine')
+      .select('*, mannschaften(id, name, liga)')
+      .eq('abfrage_token', token)
+      .single();
+
+    if (res.error || !res.data) {
+      zeigeError('Spieltermin nicht gefunden. Bitte neuen Link beim Mannschaftsführer anfordern.');
+      return;
+    }
+
+    termin       = res.data;
+    terminId     = termin.id;
+    mannschaftId = termin.mannschaften.id;
+
+    const d   = new Date(termin.datum);
+    const dt  = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+    const uhr = termin.uhrzeit ? termin.uhrzeit.slice(0,5) + ' Uhr' : '';
+
+    document.getElementById('spiel-titel').textContent =
+      (termin.heim ? 'Heimspiel' : 'Auswärtsspiel') + ' gegen ' + termin.gegner;
+    document.getElementById('spiel-meta').innerHTML =
+      termin.mannschaften.name + ' &middot; ' + termin.mannschaften.liga +
+      '<br>' + dt + (uhr ? ' &middot; ' + uhr : '');
   }
 
-  const termin = res.data;
-  terminId     = termin.id;
-  mannschaftId = termin.mannschaften.id;
-
-  const d   = new Date(termin.datum);
-  const dt  = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
-  const uhr = termin.uhrzeit ? termin.uhrzeit.slice(0,5) + ' Uhr' : '';
-
-  document.getElementById('spiel-titel').textContent =
-    (termin.heim ? 'Heimspiel' : 'Auswärtsspiel') + ' gegen ' + termin.gegner;
-  document.getElementById('spiel-meta').innerHTML =
-    termin.mannschaften.name + ' &middot; ' + termin.mannschaften.liga +
-    '<br>' + dt + (uhr ? ' &middot; ' + uhr : '');
-
+  // Spieler laden
   const sp = await sb.from('spieler')
     .select('id, name')
     .eq('mannschaft_id', mannschaftId)
     .eq('aktiv', true)
     .order('name');
 
+  // altTerminId global setzen für abschicken()
+  window._altTerminId = altTerminId;
   renderFormular(sp.data || []);
 }
 
@@ -253,12 +291,15 @@ async function abschicken() {
     anzeigeVorname = sel.options[sel.selectedIndex].text.split(' ')[0];
   }
 
-  var res = await sb.from('verfuegbarkeiten').upsert({
-    spieltermin_id: terminId,
-    spieler_id:     spielerId,
-    antwort:        gewaehlteAntwort,
-    anmerkung:      anmerkung
-  }, { onConflict: 'spieltermin_id,spieler_id' });
+  var upsertData = {
+    spieltermin_id:    terminId,
+    alternativtermin_id: window._altTerminId || null,
+    spieler_id:        spielerId,
+    antwort:           gewaehlteAntwort,
+    anmerkung:         anmerkung
+  };
+  var res = await sb.from('verfuegbarkeiten').upsert(upsertData,
+    { onConflict: 'spieltermin_id,alternativtermin_id,spieler_id' });
 
   if (res.error) {
     zeigeInlineError('Fehler: ' + res.error.message);

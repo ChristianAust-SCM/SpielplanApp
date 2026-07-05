@@ -277,74 +277,274 @@ function zeigeDetail(terminId) {
 // ============================================================
 // Verschiebung melden / Admin: neuen Termin eintragen
 // ============================================================
+// ============================================================
+// Verschiebungslogik
+// ============================================================
+
 async function meldeVerschiebung(terminId, aktuellerStatus) {
   const termin = alleTermine.find(t => t.id === terminId);
   if (!termin) return;
 
   if (istAdmin) {
-    zeigeVerschiebungsModal(termin);
+    // Admin: Alternativtermine verwalten
+    await zeigeAdminVerschiebungsModal(termin);
   } else {
-    const neuerStatus = aktuellerStatus === 'Verschiebung nötig' ? 'Geplant' : 'Verschiebung nötig';
-    const bestaetigt  = confirm(
-      neuerStatus === 'Verschiebung nötig'
-        ? 'Verschiebungsbedarf für "' + termin.gegner + '" melden?\n\nDer Admin trägt den neuen Termin ein.'
-        : 'Verschiebungsmeldung zurückziehen?'
-    );
-    if (!bestaetigt) return;
-    const { error } = await sb.from('spieltermine').update({ status: neuerStatus }).eq('id', terminId);
-    if (error) { alert('Fehler: ' + error.message); return; }
-    await ladeMannschaft(aktiveMannschaft.id);
+    // MF: Alternativtermine vorschlagen ODER Bedarf melden
+    await zeigeMFVerschiebungsModal(termin, aktuellerStatus);
   }
 }
 
-function zeigeVerschiebungsModal(termin) {
+// ── MF-Modal: Alternativtermine vorschlagen ──────────────────
+async function zeigeMFVerschiebungsModal(termin, aktuellerStatus) {
+  // Bestehende Alternativtermine laden
+  const { data: altTermine } = await sb.from('alternativtermine')
+    .select('*').eq('spieltermin_id', termin.id).order('datum');
+
   const d = new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+  const baseUrl = window.location.origin + window.location.pathname.replace('index.html','');
+
   const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;overflow-y:auto';
+
+  function renderAltTermine(liste) {
+    if (!liste || liste.length === 0)
+      return '<div style="font-size:13px;color:#8996B4;font-style:italic">Noch keine Alternativtermine eingetragen.</div>';
+    return liste.map(function(at, i) {
+      const ad = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
+      const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) + ' Uhr' : '';
+      const link = baseUrl + 'spieler.html?alt=' + at.abfrage_token;
+      const jaZahl = at._ja || 0;
+      const ampelFarbe = jaZahl >= (aktiveMannschaft?.min_spieler || 6) ? '#1D9E75' : jaZahl >= 4 ? '#F0B429' : '#8996B4';
+      return '<div style="background:#1e3048;border-radius:8px;padding:12px 14px;display:grid;gap:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div>' +
+            '<div style="font-weight:700;color:#F7F9FF;font-size:14px">Alternative ' + (i+1) + ': ' + ad + (auhr ? ' · ' + auhr : '') + '</div>' +
+            '<div style="font-size:12px;color:' + ampelFarbe + ';margin-top:2px">' + jaZahl + ' Ja-Zusagen</div>' +
+          '</div>' +
+          '<button onclick="loescheAlternativtermin(\'' + at.id + '\')" style="background:none;border:none;color:#8996B4;cursor:pointer;font-size:16px" title="Löschen">🗑</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          '<button onclick="kopierenWA(this,\'' + ('Hallo zusammen,\\nbitte prüft ob ihr an folgendem Ausweichtermin spielen könnt:\\n\\n🏓 ' + (termin.heim?'Heimspiel':'Auswärtsspiel') + ' gegen ' + termin.gegner + '\\n📅 ' + ad + (auhr?' · '+auhr:'') + '\\n\\n👉 ' + link + '\\n\\nBitte bis Mittwoch antworten. Danke!\\n– ' + (aktiveMannschaft?.mf_name?.split(' ')[0]||'Euer MF')).replace(/'/g,"\\'") + '\')" ' +
+            'style="padding:5px 10px;border-radius:6px;background:#25D366;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">' +
+            '💬 WhatsApp-Link kopieren' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
   modal.innerHTML =
-    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:480px;width:100%">' +
-      '<div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">' +
-        '<div><div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:16px;color:#F07830">Termin verschieben</div>' +
-        '<div style="font-size:13px;color:#8996B4;margin-top:2px">' + (termin.heim?'Heimspiel':'Auswärtsspiel') + ' gegen ' + termin.gegner + ' · ' + d + '</div></div>' +
+    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto" id="mf-modal-inner">' +
+      '<div style="padding:18px 22px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232;z-index:1">' +
+        '<div>' +
+          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:16px;color:#F07830">Verschiebung – Alternativtermine</div>' +
+          '<div style="font-size:13px;color:#8996B4;margin-top:2px">' + (termin.heim?'Heimspiel':'Auswärtsspiel') + ' gegen ' + termin.gegner + ' · ' + d + '</div>' +
+        '</div>' +
         '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
       '</div>' +
-      '<div style="padding:24px;display:grid;gap:16px">' +
-        '<div><label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Neues Datum</label>' +
-        '<input type="date" id="v-datum" value="' + termin.datum + '" style="width:100%;padding:10px 14px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:14px;outline:none"></div>' +
-        '<div><label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Neue Uhrzeit</label>' +
-        '<input type="time" id="v-uhrzeit" value="' + (termin.uhrzeit?termin.uhrzeit.slice(0,5):'') + '" style="width:100%;padding:10px 14px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:14px;outline:none"></div>' +
-        '<div><label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Status</label>' +
-        '<select id="v-status" style="width:100%;padding:10px 14px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:14px;outline:none">' +
-          '<option value="Verschoben"' + (termin.status==='Verschoben'?' selected':'') + '>Verschoben</option>' +
-          '<option value="Geplant"'    + (termin.status==='Geplant'   ?' selected':'') + '>Geplant</option>' +
-          '<option value="Bestätigt"'  + (termin.status==='Bestätigt' ?' selected':'') + '>Bestätigt</option>' +
-        '</select></div>' +
-        '<div style="background:rgba(212,98,10,0.1);border:1px solid rgba(212,98,10,0.25);border-radius:8px;padding:12px;font-size:13px;color:#F07830">' +
-          '⚠️ Bestehende Abstimmungen werden gelöscht. Der MF schickt danach den neuen Link per WhatsApp.' +
+      '<div style="padding:20px 22px;display:grid;gap:16px">' +
+        // Bestehende Alternativtermine
+        '<div>' +
+          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:10px">Alternativtermine</div>' +
+          '<div id="alt-liste">' + renderAltTermine(altTermine) + '</div>' +
         '</div>' +
-        '<button onclick="speichereVerschiebung(\'' + termin.id + '\')" style="padding:12px;background:#D4620A;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:15px;cursor:pointer">Termin verschieben &amp; Abstimmung löschen</button>' +
+        // Neuen Alternativtermin hinzufügen
+        '<div style="background:#1e3048;border-radius:8px;padding:14px">' +
+          '<div style="font-size:12px;font-weight:700;color:#1D9E75;margin-bottom:10px">+ Alternativtermin hinzufügen</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+            '<div>' +
+              '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:6px">Datum</label>' +
+              '<input type="date" id="alt-datum" style="width:100%;padding:9px 12px;background:#0D1B2A;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:13px;outline:none">' +
+            '</div>' +
+            '<div>' +
+              '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:6px">Uhrzeit</label>' +
+              '<input type="time" id="alt-uhrzeit" value="14:30" style="width:100%;padding:9px 12px;background:#0D1B2A;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:13px;outline:none">' +
+            '</div>' +
+          '</div>' +
+          '<button onclick="speichereAlternativtermin(\'' + termin.id + '\')" style="width:100%;margin-top:12px;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">Termin hinzufügen</button>' +
+        '</div>' +
+        // Verschiebungsbedarf melden
+        '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">' +
+          '<button onclick="meldeVerschiebungsBedarf(\'' + termin.id + '\',\'' + aktuellerStatus + '\')" style="width:100%;padding:10px;background:' +
+            (aktuellerStatus==='Verschiebung nötig'?'rgba(212,98,10,0.3)':'rgba(212,98,10,0.15)') +
+            ';color:#F07830;border:1px solid rgba(212,98,10,0.35);border-radius:8px;font-family:Calibri,sans-serif;font-size:14px;font-weight:700;cursor:pointer">' +
+            (aktuellerStatus==='Verschiebung nötig' ? '⚠️ Verschiebungsbedarf zurückziehen' : '↔️ Verschiebungsbedarf beim Admin melden') +
+          '</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
+
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
 }
 
-async function speichereVerschiebung(terminId) {
-  const datum   = document.getElementById('v-datum').value;
-  const uhrzeit = document.getElementById('v-uhrzeit').value;
-  const status  = document.getElementById('v-status').value;
+async function speichereAlternativtermin(terminId) {
+  const datum   = document.getElementById('alt-datum').value;
+  const uhrzeit = document.getElementById('alt-uhrzeit').value;
   if (!datum) { alert('Bitte ein Datum eingeben.'); return; }
 
+  const { error } = await sb.from('alternativtermine').insert({
+    spieltermin_id: terminId,
+    datum:   datum,
+    uhrzeit: uhrzeit || null
+  });
+  if (error) { alert('Fehler: ' + error.message); return; }
+
+  // Liste neu laden
+  const { data: neu } = await sb.from('alternativtermine')
+    .select('*').eq('spieltermin_id', terminId).order('datum');
+
+  const baseUrl = window.location.origin + window.location.pathname.replace('index.html','');
+  const termin  = alleTermine.find(t => t.id === terminId);
+
+  // Alt-Liste im Modal aktualisieren
+  const liste = document.getElementById('alt-liste');
+  if (liste && termin) {
+    const d = new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+    liste.innerHTML = (neu||[]).map(function(at, i) {
+      const ad = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
+      const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) + ' Uhr' : '';
+      const link = baseUrl + 'spieler.html?alt=' + at.abfrage_token;
+      return '<div style="background:#1e3048;border-radius:8px;padding:12px 14px;display:grid;gap:8px;margin-bottom:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div style="font-weight:700;color:#F7F9FF;font-size:14px">Alternative ' + (i+1) + ': ' + ad + (auhr?' · '+auhr:'') + '</div>' +
+          '<button onclick="loescheAlternativtermin(\'' + at.id + '\')" style="background:none;border:none;color:#8996B4;cursor:pointer;font-size:16px">🗑</button>' +
+        '</div>' +
+        '<button onclick="kopierenWA(this,\'' + ('Hallo zusammen,\\nbitte prüft ob ihr an folgendem Ausweichtermin spielen könnt:\\n\\n🏓 ' + (termin.heim?'Heimspiel':'Auswärtsspiel') + ' gegen ' + termin.gegner + '\\n📅 ' + ad + (auhr?' · '+auhr:'') + '\\n\\n👉 ' + link + '\\n\\nBitte bis Mittwoch antworten. Danke!\\n– ' + (aktiveMannschaft?.mf_name?.split(' ')[0]||'Euer MF')).replace(/'/g,"\\'") + '\')" ' +
+          'style="padding:5px 10px;border-radius:6px;background:#25D366;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif;width:fit-content">💬 WhatsApp-Link kopieren</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  document.getElementById('alt-datum').value = '';
+}
+
+async function loescheAlternativtermin(altId) {
+  if (!confirm('Alternativtermin und alle Abstimmungen dazu löschen?')) return;
+  await sb.from('verfuegbarkeiten').delete().eq('alternativtermin_id', altId);
+  await sb.from('alternativtermine').delete().eq('id', altId);
+  // Modal neu öffnen
+  document.querySelector('[style*="fixed"]')?.remove();
+  const termin = alleTermine[0]; // Placeholder – wird durch modal refresh ersetzt
+  await ladeMannschaft(aktiveMannschaft.id);
+}
+
+async function meldeVerschiebungsBedarf(terminId, aktuellerStatus) {
+  const neuerStatus = aktuellerStatus === 'Verschiebung nötig' ? 'Geplant' : 'Verschiebung nötig';
+  const { error } = await sb.from('spieltermine').update({ status: neuerStatus }).eq('id', terminId);
+  if (error) { alert('Fehler: ' + error.message); return; }
+  document.querySelector('[style*="fixed"]')?.remove();
+  await ladeMannschaft(aktiveMannschaft.id);
+}
+
+// ── Admin-Modal: Neuen Termin bestätigen ─────────────────────
+async function zeigeAdminVerschiebungsModal(termin) {
+  // Alternativtermine + Verfügbarkeiten laden
+  const { data: altTermine } = await sb.from('alternativtermine')
+    .select('*').eq('spieltermin_id', termin.id).order('datum');
+
+  // Ja-Zahlen je Alternativtermin
+  if (altTermine && altTermine.length > 0) {
+    for (const at of altTermine) {
+      const { data: vd } = await sb.from('verfuegbarkeiten')
+        .select('antwort').eq('alternativtermin_id', at.id);
+      at._ja = (vd||[]).filter(v => v.antwort === 'Ja').length;
+      at._vielleicht = (vd||[]).filter(v => v.antwort === 'Vielleicht').length;
+      at._nein = (vd||[]).filter(v => v.antwort === 'Nein').length;
+    }
+  }
+
+  const d = new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;overflow-y:auto';
+
+  const altHtml = altTermine && altTermine.length > 0
+    ? altTermine.map(function(at, i) {
+        const ad = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+        const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) + ' Uhr' : '';
+        const min = aktiveMannschaft?.min_spieler || 6;
+        const ampelBg = at._ja >= min ? 'rgba(29,158,117,0.15)' : at._ja >= 4 ? 'rgba(240,180,41,0.15)' : 'rgba(226,75,74,0.15)';
+        const ampelFg = at._ja >= min ? '#4FD4A8' : at._ja >= 4 ? '#F0C060' : '#F08080';
+        return '<div style="background:#1e3048;border-radius:10px;padding:14px 16px;border:1px solid rgba(255,255,255,0.08)">' +
+          '<div style="font-weight:700;color:#F7F9FF;font-size:14px;margin-bottom:6px">Alternative ' + (i+1) + ': ' + ad + (auhr?' · '+auhr:'') + '</div>' +
+          '<div style="display:flex;gap:12px;margin-bottom:12px">' +
+            '<span style="background:rgba(29,158,117,0.15);color:#4FD4A8;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._ja + ' Ja</span>' +
+            '<span style="background:rgba(240,180,41,0.12);color:#F0C060;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._vielleicht + ' Vielleicht</span>' +
+            '<span style="background:rgba(226,75,74,0.12);color:#F08080;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._nein + ' Nein</span>' +
+          '</div>' +
+          '<button onclick="bestaetigeAlternativtermin(\'' + termin.id + '\',\'' + at.datum + '\',\'' + (at.uhrzeit||'') + '\')" ' +
+            'style="width:100%;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">' +
+            '✓ Diesen Termin als neuen Spieltermin bestätigen' +
+          '</button>' +
+        '</div>';
+      }).join('')
+    : '<div style="font-size:13px;color:#8996B4;font-style:italic">Noch keine Alternativtermine vom MF eingetragen.</div>';
+
+  modal.innerHTML =
+    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto">' +
+      '<div style="padding:18px 22px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232">' +
+        '<div>' +
+          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:16px;color:#F07830">Admin – Verschiebung bestätigen</div>' +
+          '<div style="font-size:13px;color:#8996B4;margin-top:2px">' + (termin.heim?'Heimspiel':'Auswärtsspiel') + ' gegen ' + termin.gegner + ' · ' + d + '</div>' +
+        '</div>' +
+        '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
+      '</div>' +
+      '<div style="padding:20px 22px;display:grid;gap:14px">' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4">Abstimmungsergebnisse</div>' +
+        altHtml +
+        '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">' +
+          '<div style="font-size:12px;color:#8996B4;margin-bottom:10px;font-weight:700">Oder: Eigenen Termin eintragen</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+            '<input type="date" id="admin-datum" style="padding:9px 12px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:13px;outline:none">' +
+            '<input type="time" id="admin-uhrzeit" value="14:30" style="padding:9px 12px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:13px;outline:none">' +
+          '</div>' +
+          '<button onclick="bestaetigeEigenerTermin(\'' + termin.id + '\')" style="width:100%;margin-top:10px;padding:10px;background:#D4620A;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">Eigenen Termin bestätigen</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+async function bestaetigeAlternativtermin(terminId, datum, uhrzeit) {
+  if (!confirm('Diesen Alternativtermin als neuen Spieltermin bestätigen?\nAlle Alternativtermine und alten Abstimmungen werden gelöscht.')) return;
+  await _verschiebungFertigstellen(terminId, datum, uhrzeit);
+}
+
+async function bestaetigeEigenerTermin(terminId) {
+  const datum   = document.getElementById('admin-datum').value;
+  const uhrzeit = document.getElementById('admin-uhrzeit').value;
+  if (!datum) { alert('Bitte ein Datum eingeben.'); return; }
+  if (!confirm('Neuen Termin bestätigen?\nAlle Alternativtermine und alten Abstimmungen werden gelöscht.')) return;
+  await _verschiebungFertigstellen(terminId, datum, uhrzeit);
+}
+
+async function _verschiebungFertigstellen(terminId, datum, uhrzeit) {
   const neuerToken = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+
+  // 1. Spieltermin aktualisieren
   const { error: te } = await sb.from('spieltermine').update({
-    datum: datum, uhrzeit: uhrzeit || null, status: status, abfrage_token: neuerToken
+    datum: datum, uhrzeit: uhrzeit || null,
+    status: 'Verschoben', abfrage_token: neuerToken
   }).eq('id', terminId);
   if (te) { alert('Fehler: ' + te.message); return; }
 
+  // 2. Alte Abstimmungen löschen
   await sb.from('verfuegbarkeiten').delete().eq('spieltermin_id', terminId);
+
+  // 3. Alle Alternativtermine löschen
+  const { data: alts } = await sb.from('alternativtermine').select('id').eq('spieltermin_id', terminId);
+  if (alts && alts.length > 0) {
+    for (const alt of alts) {
+      await sb.from('verfuegbarkeiten').delete().eq('alternativtermin_id', alt.id);
+    }
+    await sb.from('alternativtermine').delete().eq('spieltermin_id', terminId);
+  }
+
   document.querySelector('[style*="fixed"]')?.remove();
   await ladeMannschaft(aktiveMannschaft.id);
-  alert('✓ Termin verschoben. Der MF kann jetzt den neuen Link per WhatsApp schicken.');
+  alert('✓ Termin bestätigt. Der MF kann jetzt den neuen WhatsApp-Link schicken.');
 }
 
 // ============================================================
