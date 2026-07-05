@@ -208,11 +208,11 @@ function renderTabelle() {
       ? '<span style="color:#F07830;font-size:11px;font-weight:700"> · VERSCHIEBUNG NÖTIG</span>'
       : '';
 
-    // Alternativtermine für diesen Spieltermin
-    const altTermine = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
-    const altInfo = altTermine.length > 0
+    // Alternativtermine für diesen Spieltermin (Ampel-Info)
+    const altTermineInfo = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
+    const altInfo = altTermineInfo.length > 0
       ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">' +
-          altTermine.map(function(at, i) {
+          altTermineInfo.map(function(at, i) {
             const ad  = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
             const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) : '';
             // Abstimmungen für diesen Alternativtermin aus alleVerfueg
