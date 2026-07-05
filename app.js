@@ -168,11 +168,11 @@ function ampelKlasse(terminId) {
 
 function ampelText(terminId) {
   const hat = alleVerfueg.some(v => v.spieltermin_id === terminId && v.alternativtermin_id === null);
-  if (!hat) return 'Keine Abfrage';
+  if (!hat) return null;
   const ja         = zaehleAntworten(terminId, 'Ja');
   const nein       = zaehleAntworten(terminId, 'Nein');
   const vielleicht = zaehleAntworten(terminId, 'Vielleicht');
-  return ja + ' Ja · ' + vielleicht + ' Vielleicht · ' + nein + ' Nein';
+  return { ja, nein, vielleicht };
 }
 
 function rueckmeldungText(terminId) {
@@ -267,20 +267,31 @@ function renderTabelle() {
 
     // Aktions-Buttons: bei Alternativtermin nur Verschiebungs-Button aktiv
     const aktionButtons = istAlternativ
-      ? '<button class="btn-verschiebung aktiv" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')">' +
-          (t.status === 'Verschiebung nötig' ? '⚠️ Alternativtermin läuft' : '↔️ Alternativtermin') +
-        '</button>'
-      : '<a class="btn-abfrage" href="' + abfrageLink + '" target="_blank">🔗 Link öffnen</a>' +
-        '<button class="btn-wa" onclick="kopierenWA(this, \'' + waText.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')">💬 Kopie für WhatsApp</button>' +
-        '<button class="btn-verschiebung' + (t.status === 'Verschiebung nötig' ? ' aktiv' : '') + '" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')">' +
-          (t.status === 'Verschiebung nötig' ? '⚠️ Alternativtermin läuft' : '↔️ Alternativtermin') +
-        '</button>';
+      ? '<button class="btn-verschiebung aktiv" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')" title="' + (t.status === 'Verschiebung nötig' ? 'Alternativtermin läuft' : 'Alternativtermin') + '">↔</button>'
+      : '<a class="btn-icon-link" href="' + abfrageLink + '" target="_blank" title="Link öffnen" aria-label="Link öffnen">🔗</a>' +
+        '<button class="btn-icon-wa" onclick="kopierenWA(this, \'' + waText.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')" title="WhatsApp-Text kopieren" aria-label="WhatsApp"><svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.914 0C5.34 0 0 5.34 0 11.914c0 2.11.549 4.094 1.508 5.818L0 24l6.459-1.474a11.882 11.882 0 005.455 1.32c6.573 0 11.914-5.34 11.914-11.914C23.828 5.34 18.487 0 11.914 0zm0 21.828a9.914 9.914 0 01-5.032-1.369l-.361-.214-3.734.852.87-3.638-.235-.374A9.865 9.865 0 012 11.914C2 6.443 6.443 2 11.914 2c5.472 0 9.914 4.443 9.914 9.914 0 5.472-4.442 9.914-9.914 9.914z"/></svg></button>' +
+        '<button class="btn-icon-alt" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')" title="Alternativtermin" aria-label="Alternativtermin">↔</button>';
 
     return '<tr style="' + rowStyle + '">' +
       '<td>' + datumBlock + '</td>' +
       '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
       '<td style="font-weight:700">' + t.gegner + '</td>' +
-      '<td><span class="ampel ' + kl + '"><span class="ampel-dot"></span>' + ampelLabels[kl] + ' · ' + txt + '</span>' + altInfo + '</td>' +
+      '<td>' + (txt
+        ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">' +
+            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block;"></span>' + txt.ja + ' Ja' +
+            '</span>' +
+            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block;"></span>' + txt.vielleicht + ' Vllt.' +
+            '</span>' +
+            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block;"></span>' + txt.nein + ' Nein' +
+            '</span>' +
+          '</div>'
+        : '<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;background:rgba(137,150,180,0.12)">' +
+            '<span style="width:6px;height:6px;border-radius:50%;background:#8996B4;display:inline-block;"></span>' +
+            '<span style="font-size:12px;color:#8996B4;">Keine Abfrage</span>' +
+          '</div>') + altInfo + '</td>' +
       '<td>' + (rm
         ? '<button onclick="zeigeFehlende(\'' + t.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
             '<div style="line-height:1.5">' +
@@ -698,9 +709,8 @@ function zeigeFehlende(terminId) {
 function kopierenWA(btn, text) {
   const decoded = text.replace(/\\n/g, '\n');
   navigator.clipboard.writeText(decoded).then(function() {
-    btn.textContent = '✓ Kopiert!';
     btn.classList.add('kopiert');
-    setTimeout(function() { btn.textContent = '📋 Kopieren'; btn.classList.remove('kopiert'); }, 2500);
+    setTimeout(function() { btn.classList.remove('kopiert'); }, 2500);
   }).catch(function() {
     const ta = document.createElement('textarea');
     ta.value = decoded;
@@ -709,9 +719,8 @@ function kopierenWA(btn, text) {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    btn.textContent = '✓ Kopiert!';
     btn.classList.add('kopiert');
-    setTimeout(function() { btn.textContent = '📋 Kopieren'; btn.classList.remove('kopiert'); }, 2500);
+    setTimeout(function() { btn.classList.remove('kopiert'); }, 2500);
   });
 }
 
