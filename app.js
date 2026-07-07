@@ -187,6 +187,26 @@ function rueckmeldungText(terminId) {
   return { gesamt, kader, fehlen };
 }
 
+function rueckmeldungAlt(altTermine) {
+  // Gibt pro Alternativtermin ein separates Badge zurück
+  if (!altTermine || altTermine.length === 0) return '';
+  const kader = alleSpieler.length || (aktiveMannschaft?.min_spieler || 6);
+  return altTermine.map(function(at, i) {
+    const av      = alleVerfueg.filter(v => v.alternativtermin_id === at.id);
+    const gesamt  = av.length;
+    const fehlen  = Math.max(0, kader - gesamt);
+    const ad      = new Date(at.datum).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
+    const farbe   = gesamt === 0 ? '#8996B4' : fehlen === 0 ? '#4FD4A8' : '#F08080';
+    const bg      = gesamt === 0 ? 'rgba(137,150,180,0.1)' : fehlen === 0 ? 'rgba(29,158,117,0.12)' : 'rgba(226,75,74,0.12)';
+    const label   = gesamt === 0 ? 'offen' : fehlen === 0 ? 'alle ✓' : fehlen + ' fehlen';
+    return '<div style="margin-bottom:5px;cursor:pointer" onclick="zeigeFehlende(\'' + at._spieltermin_id + '\',\'' + at.id + '\')">' +
+      '<div style="font-size:11px;color:#8996B4;margin-bottom:2px">Alt.' + (i+1) + ' · ' + ad + '</div>' +
+      '<div style="font-size:14px;font-weight:500;color:var(--white)">' + gesamt + ' / ' + kader + '</div>' +
+      '<div style="display:inline-block;padding:1px 7px;border-radius:10px;background:' + bg + ';font-size:11px;font-weight:600;color:' + farbe + '">' + label + '</div>' +
+    '</div>';
+  }).join('');
+}
+
 // ============================================================
 // Tabelle
 // ============================================================
@@ -197,7 +217,7 @@ function renderTabelle() {
     return;
   }
 
-  const baseUrl = window.location.origin + window.location.pathname.replace('index.html','');
+  const baseUrl = 'https://spielplanapp.christianaust.eu/';
   const ampelLabels = { ok: 'Spielbereit', warn: 'Zu wenig', crit: 'Nicht spielbereit', offen: 'Offen' };
 
   const rows = alleTermine.map(function(t) {
@@ -213,15 +233,7 @@ function renderTabelle() {
     const datumLang = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
     const heimAusw  = t.heim ? 'Heimspiel' : 'Auswärtsspiel';
     const mfName    = aktiveMannschaft?.mf_name?.split(' ')[0] || 'Euer MF';
-    // Verfügbarkeiten bereits vorhanden? (aus übernommener Alt-Abstimmung)
-    const verfuegBereitsVorhanden = alleVerfueg.filter(v =>
-      v.spieltermin_id === t.id && v.alternativtermin_id === null
-    ).length > 0;
-
-    // WhatsApp-Text: bei bereits vorhandenen Verfügbarkeiten → Termininfo ohne Abfragelink
-    const waText = verfuegBereitsVorhanden
-      ? 'Hallo zusammen,\nunser Spiel gegen ' + t.gegner + ' wurde verschoben.\n\n🏓 ' + heimAusw + ' gegen ' + t.gegner + '\n📅 Neuer Termin: ' + datumLang + (uhr ? ' · ' + uhr : '') + '\n\nEure Verfügbarkeit haben wir bereits – ihr müsst nichts weiter tun.\n– ' + mfName
-      : 'Hallo zusammen,\nbitte meldet eure Verfügbarkeit für unser Spiel:\n\n🏓 ' + heimAusw + ' gegen ' + t.gegner + '\n📅 ' + datumLang + (uhr ? ' · ' + uhr : '') + '\n\n👉 ' + abfrageLink + '\n\nBitte bis Mittwoch antworten. Danke!\n– ' + mfName;
+    const waText    = 'Hallo zusammen,\nbitte meldet eure Verfügbarkeit für unser Spiel:\n\n🏓 ' + heimAusw + ' gegen ' + t.gegner + '\n📅 ' + datumLang + (uhr ? ' · ' + uhr : '') + '\n\n👉 ' + abfrageLink + '\n\nBitte bis Mittwoch antworten. Danke!\n– ' + mfName;
 
     const statusBadge = t.status === 'Verschoben'
       ? '<span style="color:#F0B429;font-size:11px;font-weight:700"> · ALTERNATIVTERMIN</span>'
@@ -229,31 +241,38 @@ function renderTabelle() {
       ? '<span style="color:#F07830;font-size:11px;font-weight:700"> · VERSCHIEBUNG NÖTIG</span>'
       : '';
 
-    // Alternativtermine – Badges pro Alt-Termin
-    const altTermineInfo = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
-    const altVerfuegbarkeit = altTermineInfo.length > 0
-      ? '<div style="display:flex;flex-direction:column;gap:6px">' +
+    // Alternativtermine mit _spieltermin_id für zeigeFehlende
+    const altTermineInfo = alleAlternativtermine.filter(a => a.spieltermin_id === t.id)
+      .map(a => ({ ...a, _spieltermin_id: t.id }));
+
+    const altInfo = altTermineInfo.length > 0
+      ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">' +
           altTermineInfo.map(function(at, i) {
-            const ad   = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
-            const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) + ' Uhr' : '';
+            const ad  = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
+            const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) : '';
             const altVerfueg = alleVerfueg.filter(v => v.alternativtermin_id === at.id);
             const altJa   = altVerfueg.filter(v => v.antwort === 'Ja').length;
             const altViel = altVerfueg.filter(v => v.antwort === 'Vielleicht').length;
             const altNein = altVerfueg.filter(v => v.antwort === 'Nein').length;
-            const hatAbstimmung = altVerfueg.length > 0;
-            return '<div>' +
-              '<div style="font-size:11px;color:#8996B4;margin-bottom:3px;font-weight:700">Alt.' + (i+1) + ': ' + ad + (auhr?' · '+auhr:'') + '</div>' +
-              (hatAbstimmung
-                ? '<div style="display:flex;gap:3px;flex-wrap:wrap">' +
-                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041"><span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span>' + altJa + ' Ja</span>' +
-                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806"><span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block"></span>' + altViel + ' Vllt.</span>' +
-                    '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F"><span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>' + altNein + ' Nein</span>' +
-                  '</div>'
-                : '<span style="font-size:12px;color:#8996B4;font-style:italic">Noch keine Abstimmung</span>'
-              ) + '</div>';
-          }).join('<div style="height:1px;background:rgba(255,255,255,0.07);margin:2px 0"></div>') +
+            const min = aktiveMannschaft?.min_spieler || 6;
+            const altFarbe = altJa >= min ? '#4FD4A8' : altJa >= 4 ? '#F0C060' : '#8996B4';
+            return '<div style="background:rgba(212,98,10,0.08);border-radius:6px;padding:4px 8px;margin-bottom:2px">' +
+              '<div style="font-size:11px;color:#F07830;font-weight:700;margin-bottom:2px">Alt.' + (i+1) + ': ' + ad + (auhr?' · '+auhr+' Uhr':'') + '</div>' +
+              '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:8px;background:#E1F5EE;font-size:11px;font-weight:700;color:#085041">' +
+                  '<span style="width:5px;height:5px;border-radius:50%;background:#1D9E75;display:inline-block;"></span>' + altJa + ' Ja' +
+                '</span>' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:8px;background:#FAEEDA;font-size:11px;font-weight:700;color:#633806">' +
+                  '<span style="width:5px;height:5px;border-radius:50%;background:#EF9F27;display:inline-block;"></span>' + altViel + ' Vllt.' +
+                '</span>' +
+                '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:8px;background:#FCEBEB;font-size:11px;font-weight:700;color:#791F1F">' +
+                  '<span style="width:5px;height:5px;border-radius:50%;background:#E24B4A;display:inline-block;"></span>' + altNein + ' Nein' +
+                '</span>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
         '</div>'
-      : null;
+      : '';
 
     // Ist dieser Termin im Alternativtermin-Modus?
     const istAlternativ = t.status === 'Verschoben' || t.status === 'Verschiebung nötig';
@@ -287,30 +306,34 @@ function renderTabelle() {
       '<td>' + datumBlock + '</td>' +
       '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
       '<td style="font-weight:700">' + t.gegner + '</td>' +
-      '<td>' + (istAlternativ
-        ? (altVerfuegbarkeit || '<span style="font-size:13px;color:#8996B4;">–</span>')
-        : (txt
-            ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
-                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041"><span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span>' + txt.ja + ' Ja</span>' +
-                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806"><span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block"></span>' + txt.vielleicht + ' Vllt.</span>' +
-                '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F"><span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block"></span>' + txt.nein + ' Nein</span>' +
-              '</div>'
-            : '<span style="font-size:13px;color:#8996B4;">–</span>')
-      ) + '</td>' +
-      '<td>' + (istAlternativ
-        ? (function() {
-            const altIds = altTermineInfo.map(a => a.id);
-            const alleAltStimmen = alleVerfueg.filter(v => altIds.includes(v.alternativtermin_id));
-            const eindeutig = [...new Set(alleAltStimmen.map(v => v.spieler_id))].length;
-            const kader = alleSpieler.length || 6;
-            return eindeutig > 0
-              ? '<div style="line-height:1.5"><div style="font-size:15px;font-weight:700;color:#F7F9FF">' + eindeutig + ' / ' + kader + '</div><div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;background:rgba(212,98,10,0.15);color:#F07830">abgestimmt</div></div>'
-              : '<span style="font-size:12px;color:var(--muted)">–</span>';
-          })()
-        : (rm
-            ? '<button onclick="zeigeFehlende(\'' + t.id + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0"><div style="line-height:1.5"><div style="font-size:15px;font-weight:700;color:' + (rm.fehlen === 0 ? '#4FD4A8' : '#F7F9FF') + '">' + rm.gesamt + ' / ' + rm.kader + '</div><div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;' + (rm.fehlen === 0 ? 'background:rgba(29,158,117,0.15);color:#4FD4A8' : 'background:rgba(226,75,74,0.15);color:#F08080') + '">' + (rm.fehlen === 0 ? '✓ alle' : rm.fehlen + ' fehlen') + '</div></div></button>'
-            : '<span style="font-size:12px;color:var(--muted)">–</span>')
-      ) + '</td>' +
+      '<td>' + (txt
+        ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">' +
+            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block;"></span>' + txt.ja + ' Ja' +
+            '</span>' +
+            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FAEEDA;font-size:12px;font-weight:700;color:#633806">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:#EF9F27;display:inline-block;"></span>' + txt.vielleicht + ' Vllt.' +
+            '</span>' +
+            '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#FCEBEB;font-size:12px;font-weight:700;color:#791F1F">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:#E24B4A;display:inline-block;"></span>' + txt.nein + ' Nein' +
+            '</span>' +
+          '</div>'
+        : '<span style="font-size:13px;color:#8996B4;">–</span>') + altInfo + '</td>' +
+      '<td>' + (istAlternativ && altTermineInfo.length > 0
+        ? rueckmeldungAlt(altTermineInfo)
+        : rm
+          ? '<button onclick="zeigeFehlende(\'' + t.id + '\',null)" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
+              '<div style="line-height:1.5">' +
+                '<div style="font-size:15px;font-weight:700;color:' + (rm.fehlen === 0 ? '#4FD4A8' : '#F7F9FF') + '">' + rm.gesamt + ' / ' + rm.kader + '</div>' +
+                '<div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;' +
+                  (rm.fehlen === 0
+                    ? 'background:rgba(29,158,117,0.15);color:#4FD4A8'
+                    : 'background:rgba(226,75,74,0.15);color:#F08080') + '">' +
+                  (rm.fehlen === 0 ? '✓ alle' : rm.fehlen + ' fehlen') +
+                '</div>' +
+              '</div>' +
+            '</button>'
+          : '<span style="font-size:12px;color:var(--muted)">–</span>') + '</td>' +
       '<td style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap">' + aktionButtons + '</td>' +
     '</tr>';
   }).join('');
@@ -400,7 +423,7 @@ async function zeigeMFVerschiebungsModal(termin, aktuellerStatus) {
     .select('*').eq('spieltermin_id', termin.id).order('datum');
 
   const d = new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
-  const baseUrl = window.location.origin + window.location.pathname.replace('index.html','');
+  const baseUrl = 'https://spielplanapp.christianaust.eu/';
 
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;overflow-y:auto';
@@ -493,7 +516,7 @@ async function speichereAlternativtermin(terminId) {
   const { data: neu } = await sb.from('alternativtermine')
     .select('*').eq('spieltermin_id', terminId).order('datum');
 
-  const baseUrl = window.location.origin + window.location.pathname.replace('index.html','');
+  const baseUrl = 'https://spielplanapp.christianaust.eu/';
   const termin  = alleTermine.find(t => t.id === terminId);
 
   // Alt-Liste im Modal aktualisieren
@@ -571,15 +594,10 @@ async function zeigeAdminVerschiebungsModal(termin) {
             '<span style="background:rgba(240,180,41,0.12);color:#F0C060;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._vielleicht + ' Vielleicht</span>' +
             '<span style="background:rgba(226,75,74,0.12);color:#F08080;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._nein + ' Nein</span>' +
           '</div>' +
-          (at._ja >= min
-            ? '<button onclick="bestaetigeAlternativtermin(\'' + termin.id + '\',\'' + at.id + '\',\'' + at.datum + '\',\'' + (at.uhrzeit||'') + '\')" ' +
-                'style="width:100%;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">' +
-                '✓ Diesen Termin übernehmen – Abstimmung wird als Verfügbarkeit gesetzt' +
-              '</button>'
-            : '<div style="width:100%;padding:10px;background:rgba(137,150,180,0.08);border:1px solid rgba(137,150,180,0.2);border-radius:8px;font-size:13px;color:#8996B4;text-align:center">' +
-                '⏳ Noch nicht genug Zusagen (' + at._ja + ' / ' + min + ' benötigt)' +
-              '</div>'
-          ) +
+          '<button onclick="bestaetigeAlternativtermin(\'' + termin.id + '\',\'' + at.datum + '\',\'' + (at.uhrzeit||'') + '\')" ' +
+            'style="width:100%;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">' +
+            '✓ Diesen Termin als neuen Spieltermin bestätigen' +
+          '</button>' +
         '</div>';
       }).join('')
     : '<div style="font-size:13px;color:#8996B4;font-style:italic">Noch keine Alternativtermine vom MF eingetragen.</div>';
@@ -604,9 +622,6 @@ async function zeigeAdminVerschiebungsModal(termin) {
           '</div>' +
           '<button onclick="bestaetigeEigenerTermin(\'' + termin.id + '\')" style="width:100%;margin-top:10px;padding:10px;background:#D4620A;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">Eigenen Termin bestätigen</button>' +
         '</div>' +
-        '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px;margin-top:4px">' +
-          '<button onclick="keinerPasst(\'' + termin.id + '\')" style="width:100%;padding:10px;background:rgba(226,75,74,0.12);border:1px solid rgba(226,75,74,0.35);color:#F08080;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:13px;cursor:pointer">✕ Keiner der Termine passt – alle löschen &amp; neu vorschlagen</button>' +
-        '</div>' +
       '</div>' +
     '</div>';
 
@@ -614,53 +629,33 @@ async function zeigeAdminVerschiebungsModal(termin) {
   document.body.appendChild(modal);
 }
 
-async function bestaetigeAlternativtermin(terminId, altId, datum, uhrzeit) {
-  if (!confirm('Diesen Alternativtermin bestätigen?\nDie Abstimmungsergebnisse werden als Verfügbarkeit übernommen.')) return;
-  await _verschiebungFertigstellen(terminId, datum, uhrzeit, altId);
+async function bestaetigeAlternativtermin(terminId, datum, uhrzeit) {
+  if (!confirm('Diesen Alternativtermin als neuen Spieltermin bestätigen?\nAlle Alternativtermine und alten Abstimmungen werden gelöscht.')) return;
+  await _verschiebungFertigstellen(terminId, datum, uhrzeit);
 }
 
 async function bestaetigeEigenerTermin(terminId) {
   const datum   = document.getElementById('admin-datum').value;
   const uhrzeit = document.getElementById('admin-uhrzeit').value;
   if (!datum) { alert('Bitte ein Datum eingeben.'); return; }
-  if (!confirm('Eigenen Termin bestätigen?\nAlle Alt-Abstimmungen werden gelöscht.')) return;
-  await _verschiebungFertigstellen(terminId, datum, uhrzeit, null);
+  if (!confirm('Neuen Termin bestätigen?\nAlle Alternativtermine und alten Abstimmungen werden gelöscht.')) return;
+  await _verschiebungFertigstellen(terminId, datum, uhrzeit);
 }
 
-async function _verschiebungFertigstellen(terminId, datum, uhrzeit, gewaehltAltId) {
-  // 1. Spieltermin aktualisieren – Status zurück auf Geplant
+async function _verschiebungFertigstellen(terminId, datum, uhrzeit) {
+  const neuerToken = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+
+  // 1. Spieltermin aktualisieren
   const { error: te } = await sb.from('spieltermine').update({
-    datum: datum,
-    uhrzeit: uhrzeit || null,
-    status: 'Geplant'
+    datum: datum, uhrzeit: uhrzeit || null,
+    status: 'Verschoben', abfrage_token: neuerToken
   }).eq('id', terminId);
   if (te) { alert('Fehler: ' + te.message); return; }
 
-  // 2. Alternativtermine abräumen
-  const { data: alts } = await sb.from('alternativtermine').select('id').eq('spieltermin_id', terminId);
-  if (alts && alts.length > 0) {
-    for (const alt of alts) {
-      if (gewaehltAltId && alt.id === gewaehltAltId) {
-        // Gewählter Alt-Termin: Abstimmungen als normale Verfügbarkeiten übernehmen
-        await sb.from('verfuegbarkeiten').delete()
-          .eq('spieltermin_id', terminId).is('alternativtermin_id', null);
-        await sb.from('verfuegbarkeiten').update({ alternativtermin_id: null })
-          .eq('alternativtermin_id', gewaehltAltId);
-      } else {
-        // Andere Alt-Termine: Abstimmungen löschen
-        await sb.from('verfuegbarkeiten').delete().eq('alternativtermin_id', alt.id);
-      }
-    }
-    await sb.from('alternativtermine').delete().eq('spieltermin_id', terminId);
-  }
+  // 2. Alte Abstimmungen löschen
+  await sb.from('verfuegbarkeiten').delete().eq('spieltermin_id', terminId);
 
-  document.querySelector('[style*="fixed"]')?.remove();
-  await ladeMannschaft(aktiveMannschaft.id);
-  alert('✓ Termin bestätigt. Verfügbarkeiten aus der Abstimmung wurden übernommen.');
-}
-
-async function keinerPasst(terminId) {
-  if (!confirm('Alle Alternativtermine löschen und neu vorschlagen?')) return;
+  // 3. Alle Alternativtermine löschen
   const { data: alts } = await sb.from('alternativtermine').select('id').eq('spieltermin_id', terminId);
   if (alts && alts.length > 0) {
     for (const alt of alts) {
@@ -668,20 +663,27 @@ async function keinerPasst(terminId) {
     }
     await sb.from('alternativtermine').delete().eq('spieltermin_id', terminId);
   }
+
   document.querySelector('[style*="fixed"]')?.remove();
   await ladeMannschaft(aktiveMannschaft.id);
-  alert('Alternativtermine gelöscht. Der MF kann jetzt neue Termine vorschlagen.');
+  alert('✓ Termin bestätigt. Der MF kann jetzt den neuen WhatsApp-Link schicken.');
 }
 
 // ============================================================
 // Fehlende Rückmeldungen anzeigen
 // ============================================================
-function zeigeFehlende(terminId) {
+function zeigeFehlende(terminId, altTerminId) {
   const termin = alleTermine.find(t => t.id === terminId);
   if (!termin) return;
 
+  // Alternativtermin-Info wenn vorhanden
+  const altTermin = altTerminId
+    ? alleAlternativtermine.find(a => a.id === altTerminId)
+    : null;
+
   const hatGeantwortet = alleVerfueg
-    .filter(v => v.spieltermin_id === terminId && v.alternativtermin_id === null)
+    .filter(v => v.spieltermin_id === terminId &&
+      (altTerminId ? v.alternativtermin_id === altTerminId : v.alternativtermin_id === null))
     .map(v => v.spieler_id);
 
   const nochNicht = alleSpieler.filter(s => !hatGeantwortet.includes(s.id));
@@ -689,7 +691,14 @@ function zeigeFehlende(terminId) {
 
   function vorname(n) { const p = n.split(','); return p.length===2 ? p[1].trim()+' '+p[0].trim() : n; }
 
-  const d = new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit' });
+  const d = altTermin
+    ? new Date(altTermin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit' }) +
+      (altTermin.uhrzeit ? ' · ' + altTermin.uhrzeit.slice(0,5) + ' Uhr' : '')
+    : new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit' });
+
+  const titel = altTermin
+    ? 'Alternativtermin · ' + (termin.heim?'Heim':'Auswärts') + ' gegen ' + termin.gegner
+    : 'Rückmeldungen · ' + (termin.heim?'Heim':'Auswärts') + ' gegen ' + termin.gegner;
 
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px';
@@ -704,7 +713,11 @@ function zeigeFehlende(terminId) {
       ).join('');
 
   const habenHtml = haben.map(s => {
-    const v = alleVerfueg.find(v => v.spieltermin_id === terminId && v.spieler_id === s.id && v.alternativtermin_id === null);
+    const v = alleVerfueg.find(v =>
+      v.spieltermin_id === terminId &&
+      v.spieler_id === s.id &&
+      (altTerminId ? v.alternativtermin_id === altTerminId : v.alternativtermin_id === null)
+    );
     const farbe = v?.antwort === 'Ja' ? '#4FD4A8' : v?.antwort === 'Nein' ? '#F08080' : '#F0C060';
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#1e3048;border-radius:6px;margin-bottom:6px">' +
       '<span style="font-size:13px;color:#F7F9FF">' + vorname(s.name) + '</span>' +
@@ -716,7 +729,7 @@ function zeigeFehlende(terminId) {
     '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:460px;width:100%;max-height:85vh;overflow-y:auto">' +
       '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232">' +
         '<div>' +
-          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:#F07830">Rückmeldungen · ' + (termin.heim?'Heim':'Auswärts') + ' gegen ' + termin.gegner + '</div>' +
+          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:' + (altTermin ? '#F07830' : '#F07830') + '">' + titel + '</div>' +
           '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + d + '</div>' +
         '</div>' +
         '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
