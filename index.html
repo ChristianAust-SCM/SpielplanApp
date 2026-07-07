@@ -51,7 +51,7 @@
     .header-right { font-size: 12px; color: var(--muted); text-align: right; }
 
     /* ── Layout ── */
-    .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .main { padding: 24px; max-width: 1100px; margin: 0 auto; }
 
     /* ── Mannschaft-Tabs ── */
     .tabs {
@@ -106,16 +106,7 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 14px;
-      table-layout: fixed;
     }
-    .spielplan-table th:nth-child(1) { width: 120px; }
-    .spielplan-table th:nth-child(2) { width: 80px; }
-    .spielplan-table th:nth-child(3) { width: auto; }
-    .spielplan-table th:nth-child(4) { width: 220px; }
-    .spielplan-table th:nth-child(5) { width: 100px; }
-    .spielplan-table th:nth-child(6) { width: 105px; }
-    .spielplan-table td { overflow: hidden; }
-    .main { padding: 24px 16px; }
     .spielplan-table thead tr {
       background: var(--navy3);
       border-bottom: 1px solid var(--line);
@@ -192,18 +183,20 @@
     .btn-link svg { width: 13px; height: 13px; }
 
     /* Abfrage-Button */
-    .btn-icon-link, .btn-icon-wa, .btn-icon-alt {
-      width: 26px; height: 26px; border-radius: 6px;
-      display: inline-flex; align-items: center; justify-content: center;
-      font-size: 14px; cursor: pointer; border: none;
-      transition: opacity 140ms; flex-shrink: 0;
+    .btn-abfrage {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 6px;
+      background: #D4A017;
+      color: #1a1000;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
       text-decoration: none;
+      transition: opacity 140ms;
     }
-    .btn-icon-link { background: #D4A017; color: #1a1000; }
-    .btn-icon-wa   { background: #25D366; color: #fff; }
-    .btn-icon-alt  { background: rgba(212,98,10,0.15); border: 1px solid rgba(212,98,10,0.4) !important; color: #F07830; font-size: 13px; font-weight: 700; }
-    .btn-icon-link:hover, .btn-icon-wa:hover, .btn-icon-alt:hover { opacity: 0.85; }
-    .btn-icon-wa.kopiert { background: #128C45; }
+    .btn-abfrage:hover { opacity: 0.85; }
 
     .btn-wa {
       display: inline-block;
@@ -303,6 +296,7 @@
   </div>
   <div class="header-right" style="display:flex;align-items:center;gap:12px">
     <button id="btn-export" onclick="exportExcel()" style="padding:7px 14px;border-radius:6px;background:rgba(29,158,117,0.15);border:1px solid rgba(29,158,117,0.35);color:#4FD4A8;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif;transition:all 140ms" onmouseover="this.style.background='rgba(29,158,117,0.28)'" onmouseout="this.style.background='rgba(29,158,117,0.15)'">📊 Excel exportieren</button>
+    <button id="btn-export-pdf" onclick="exportPDF()" style="padding:7px 14px;border-radius:6px;background:rgba(212,98,10,0.15);border:1px solid rgba(212,98,10,0.40);color:#F07830;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif;transition:all 140ms" onmouseover="this.style.background='rgba(212,98,10,0.28)'" onmouseout="this.style.background='rgba(212,98,10,0.15)'">📄 PDF exportieren</button>
     <div id="header-status">Verbinde...</div>
   </div>
 </header>

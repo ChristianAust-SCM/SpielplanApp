@@ -205,3 +205,250 @@ function ladeSheetJS() {
     document.head.appendChild(s);
   });
 }
+
+// ============================================================
+// PDF-Export · jsPDF + autoTable
+// ============================================================
+
+async function exportPDF() {
+  const btn = document.getElementById('btn-export-pdf');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Wird erstellt...'; }
+
+  try {
+    await ladePDFLibs();
+    const { jsPDF } = window.jspdf;
+
+    // Farben als RGB-Arrays
+    const NAVY    = [13,  27,  42];
+    const NAVY2   = [21,  34,  50];
+    const ORANGE  = [212, 98,  10];
+    const TEAL    = [29,  158, 117];
+    const PURPLE  = [83,  74,  183];
+    const WHITE   = [247, 249, 255];
+    const MUTED   = [137, 150, 180];
+    const JA_BG   = [212, 240, 228]; const JA_FG   = [15,  110, 86];
+    const NEIN_BG = [250, 215, 215]; const NEIN_FG = [163, 45,  45];
+    const VIEL_BG = [255, 240, 192]; const VIEL_FG = [133, 79,  11];
+    const OFFEN_BG= [235, 235, 235]; const OFFEN_FG= [136, 136, 136];
+
+    for (const mf of alleMannschaften) {
+      const [termRes, spRes] = await Promise.all([
+        sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
+        sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('name')
+      ]);
+
+      const termine = termRes.data || [];
+      const spieler = spRes.data  || [];
+      let verfueg = [];
+
+      if (termine.length > 0) {
+        const { data: vd } = await sb.from('verfuegbarkeiten')
+          .select('*').in('spieltermin_id', termine.map(t => t.id));
+        verfueg = vd || [];
+      }
+
+      const minSpieler = mf.min_spieler || 6;
+
+      function vorname(dbName) {
+        const p = dbName.split(',');
+        return p.length === 2 ? p[1].trim().split(' ')[0] + ' ' + p[0].trim() : dbName;
+      }
+
+      function getAntwort(terminId, spielerId) {
+        const v = verfueg.find(v => v.spieltermin_id === terminId && v.spieler_id === spielerId);
+        return v ? v.antwort : '';
+      }
+
+      function jaSum(terminId) {
+        return spieler.filter(sp => getAntwort(terminId, sp.id) === 'Ja').length;
+      }
+
+      // Querformat für viele Spieler
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const PW = doc.internal.pageSize.getWidth();   // 297
+      const PH = doc.internal.pageSize.getHeight();  // 210
+
+      // ── Header-Block ────────────────────────────────────
+      // Navy-Balken oben
+      doc.setFillColor(...NAVY);
+      doc.rect(0, 0, PW, 22, 'F');
+
+      // Titel
+      doc.setTextColor(...WHITE);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text('FC Strass e.V.', 10, 9);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...MUTED);
+      doc.text(`Verfügbarkeit Vorrunde 2026/27  ·  ${mf.name}  ·  ${mf.liga}`, 10, 15);
+
+      // MF rechts
+      doc.setFontSize(9);
+      doc.setTextColor(...ORANGE);
+      doc.text(`Mannschaftsführer: ${mf.mf_name || '–'}`, PW - 10, 9,  { align: 'right' });
+
+      // Legende rechts
+      doc.setTextColor(...MUTED);
+      doc.text(`Mindest-Zusagen: ${minSpieler}  ·  ✓ Ja  ·  ? Vielleicht  ·  ✗ Nein  ·  – Offen`, PW - 10, 15, { align: 'right' });
+
+      // Trennlinie
+      doc.setDrawColor(...ORANGE);
+      doc.setLineWidth(0.6);
+      doc.line(0, 22, PW, 22);
+
+      // ── Tabelle ─────────────────────────────────────────
+      const spielerNamen = spieler.map(sp => vorname(sp.name));
+
+      const head = [['Datum', 'H/A', 'Gegner', 'Status', 'Σ Ja', ...spielerNamen]];
+
+      const body = termine.map((t, ri) => {
+        const d   = new Date(t.datum);
+        const dt  = d.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'2-digit' });
+        const ja  = jaSum(t.id);
+        const hatAntworten = verfueg.some(v => v.spieltermin_id === t.id);
+        const antworten = spieler.map(sp => {
+          const a = getAntwort(t.id, sp.id);
+          return a === 'Ja' ? '✓' : a === 'Nein' ? '✗' : a === 'Vielleicht' ? '?' : '–';
+        });
+        return [
+          dt,
+          t.heim ? 'Heim' : 'Auswärts',
+          t.gegner,
+          t.status || 'Geplant',
+          hatAntworten ? String(ja) : '–',
+          ...antworten
+        ];
+      });
+
+      // Summenzeile
+      const spielbereit = termine.filter(t => jaSum(t.id) >= minSpieler).length;
+      body.push([
+        { content: `Spielbereit (≥${minSpieler} Ja):`, colSpan: 4, styles: { halign: 'right', fontStyle: 'bold', fillColor: NAVY, textColor: WHITE } },
+        { content: String(spielbereit), styles: { halign: 'center', fontStyle: 'bold', fillColor: JA_BG, textColor: JA_FG } },
+        ...spieler.map(() => ({ content: '', styles: { fillColor: NAVY2 } }))
+      ]);
+
+      // Spaltenbreiten dynamisch
+      const fixedW = 26 + 16 + 42 + 18 + 12; // Datum+H/A+Gegner+Status+ΣJa
+      const spW = Math.max(10, Math.floor((PW - 20 - fixedW) / spieler.length));
+
+      doc.autoTable({
+        head,
+        body,
+        startY: 25,
+        margin: { left: 10, right: 10 },
+        tableWidth: PW - 20,
+        styles: {
+          font: 'helvetica',
+          fontSize: 8,
+          cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
+          valign: 'middle',
+          overflow: 'linebreak'
+        },
+        headStyles: {
+          fillColor: NAVY,
+          textColor: WHITE,
+          fontStyle: 'bold',
+          halign: 'center',
+          fontSize: 8,
+          cellPadding: { top: 3, bottom: 3, left: 2, right: 2 }
+        },
+        columnStyles: {
+          0: { cellWidth: 26, halign: 'left',   fontStyle: 'bold', textColor: NAVY },
+          1: { cellWidth: 16, halign: 'center' },
+          2: { cellWidth: 42, halign: 'left',   fontStyle: 'bold', textColor: NAVY },
+          3: { cellWidth: 18, halign: 'center', fontSize: 7 },
+          4: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
+          ...Object.fromEntries(spieler.map((_, i) => [5 + i, { cellWidth: spW, halign: 'center', fontStyle: 'bold', fontSize: 9 }]))
+        },
+        alternateRowStyles: { fillColor: [245, 247, 252] },
+        didParseCell(data) {
+          const { row, column, cell } = data;
+          if (data.section === 'head') return;
+          if (row.index >= termine.length) return; // Summenzeile separat
+
+          const ri = row.index;
+          const t  = termine[ri];
+          if (!t) return;
+
+          // H/A Spalte färben
+          if (column.index === 1) {
+            cell.styles.fillColor = t.heim ? [238, 237, 254] : [250, 236, 231];
+            cell.styles.textColor = t.heim ? PURPLE : ORANGE;
+          }
+
+          // Status-Farbe
+          if (column.index === 3) {
+            if (t.status === 'Verschoben') cell.styles.textColor = ORANGE;
+            else if (t.status === 'Bestätigt') cell.styles.textColor = TEAL;
+            else cell.styles.textColor = MUTED;
+          }
+
+          // Σ Ja färben
+          if (column.index === 4) {
+            const hatAntworten = verfueg.some(v => v.spieltermin_id === t.id);
+            const ja = jaSum(t.id);
+            if (!hatAntworten) { cell.styles.fillColor = OFFEN_BG; cell.styles.textColor = OFFEN_FG; }
+            else if (ja >= minSpieler) { cell.styles.fillColor = JA_BG; cell.styles.textColor = JA_FG; }
+            else if (ja >= minSpieler - 2) { cell.styles.fillColor = VIEL_BG; cell.styles.textColor = VIEL_FG; }
+            else { cell.styles.fillColor = NEIN_BG; cell.styles.textColor = NEIN_FG; }
+          }
+
+          // Spieler-Antworten färben
+          if (column.index >= 5) {
+            const sp  = spieler[column.index - 5];
+            if (!sp) return;
+            const ant = getAntwort(t.id, sp.id);
+            if (ant === 'Ja')         { cell.styles.fillColor = JA_BG;   cell.styles.textColor = JA_FG; }
+            else if (ant === 'Nein')  { cell.styles.fillColor = NEIN_BG; cell.styles.textColor = NEIN_FG; }
+            else if (ant === 'Vielleicht') { cell.styles.fillColor = VIEL_BG; cell.styles.textColor = VIEL_FG; }
+            else                      { cell.styles.fillColor = OFFEN_BG; cell.styles.textColor = OFFEN_FG; }
+          }
+        },
+        didDrawPage(data) {
+          // Footer jede Seite
+          doc.setFontSize(7);
+          doc.setTextColor(...MUTED);
+          const now = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+          doc.text(`FC Strass e.V.  ·  ${mf.name}  ·  Erstellt: ${now}`, 10, PH - 5);
+          doc.text(`Seite ${doc.internal.getCurrentPageInfo().pageNumber}`, PW - 10, PH - 5, { align: 'right' });
+          // Trennlinie Footer
+          doc.setDrawColor(...NAVY2);
+          doc.setLineWidth(0.3);
+          doc.line(10, PH - 8, PW - 10, PH - 8);
+        }
+      });
+
+      // Pro Mannschaft eigene PDF-Datei
+      const heute = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).replace(/\./g,'-');
+      const name  = mf.name.replace(/\./g,'').trim().replace(/\s+/g,'_');
+      doc.save(`FCStrass_${name}_Verfuegbarkeit_${heute}.pdf`);
+    }
+
+  } catch (err) {
+    alert('Fehler beim PDF-Export: ' + err.message);
+    console.error(err);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 PDF exportieren'; }
+  }
+}
+
+function ladePDFLibs() {
+  return new Promise((resolve, reject) => {
+    if (window.jspdf && window.jspdf.jsPDF) { resolve(); return; }
+
+    const jspdfScript = document.createElement('script');
+    jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    jspdfScript.onload = () => {
+      const atScript = document.createElement('script');
+      atScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+      atScript.onload = resolve;
+      atScript.onerror = () => reject(new Error('autoTable konnte nicht geladen werden'));
+      document.head.appendChild(atScript);
+    };
+    jspdfScript.onerror = () => reject(new Error('jsPDF konnte nicht geladen werden'));
+    document.head.appendChild(jspdfScript);
+  });
+}
