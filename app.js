@@ -319,7 +319,7 @@ function renderTabelle() {
             '</span>' +
           '</div>'
         : '<span style="font-size:13px;color:#8996B4;">–</span>') + altInfo + '</td>' +
-      '<td>' + (istAlternativ && altTermineInfo.length > 0
+      '<td>' + (altTermineInfo.length > 0
         ? rueckmeldungAlt(altTermineInfo)
         : rm
           ? '<button onclick="zeigeFehlende(\'' + t.id + '\',null)" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
