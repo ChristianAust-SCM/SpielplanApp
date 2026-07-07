@@ -72,6 +72,8 @@ async function exportExcel() {
         return v ? v.antwort : '';
       }
 
+      const minSpieler = mf.min_spieler || 6;
+
       function jaSum(terminId) {
         return spieler.filter(sp => getAntwort(terminId, sp.id) === 'Ja').length;
       }
@@ -100,7 +102,7 @@ async function exportExcel() {
       );
       merges.push({ s: { r:1, c:3 }, e: { r:1, c:lastCol } });
       ws[encC(1,3)] = cs(
-        "Mindestens 6 Ja-Zusagen erforderlich  ·  ✓ Ja  ·  ? Vielleicht  ·  ✗ Nein  ·  – Keine Antwort",
+        `Mindestens ${minSpieler} Ja-Zusagen erforderlich  ·  ✓ Ja  ·  ? Vielleicht  ·  ✗ Nein  ·  – Keine Antwort`,
         { font: hFont(ORANGE, true, 9), fill: hFill(NAVY2), alignment: hAlign("left","center") }
       );
 
@@ -149,8 +151,8 @@ async function exportExcel() {
         ws[encC(row,3)] = cs(t.status || 'Geplant', { font: hFont(stFg, true, 9), fill: hFill(rowBg), alignment: hAlign("center","center"), border: hBorder() });
 
         // Σ Ja
-        const sumBg = !hatAntworten ? OFFEN_BG : ja >= 6 ? JA_BG : ja >= 4 ? VIEL_BG : NEIN_BG;
-        const sumFg = !hatAntworten ? OFFEN_FG : ja >= 6 ? JA_FG : ja >= 4 ? VIEL_FG : NEIN_FG;
+        const sumBg = !hatAntworten ? OFFEN_BG : ja >= minSpieler ? JA_BG : ja >= minSpieler - 2 ? VIEL_BG : NEIN_BG;
+        const sumFg = !hatAntworten ? OFFEN_FG : ja >= minSpieler ? JA_FG : ja >= minSpieler - 2 ? VIEL_FG : NEIN_FG;
         ws[encC(row,4)] = cs(hatAntworten ? ja : '–', { font: hFont(sumFg, true, 11), fill: hFill(sumBg), alignment: hAlign("center","center"), border: hBorder() });
 
         // Spieler
@@ -163,8 +165,8 @@ async function exportExcel() {
       const sumRow = 4 + termine.length;
       rows.push({ hpt: 22 });
       merges.push({ s: { r:sumRow, c:0 }, e: { r:sumRow, c:3 } });
-      ws[encC(sumRow,0)] = cs('Spielbereit (≥6 Ja):', { font: hFont(WHITE, true, 10), fill: hFill(NAVY), alignment: hAlign("right","center") });
-      const spielbereit = termine.filter(t => jaSum(t.id) >= 6).length;
+      ws[encC(sumRow,0)] = cs(`Spielbereit (≥${minSpieler} Ja):`, { font: hFont(WHITE, true, 10), fill: hFill(NAVY), alignment: hAlign("right","center") });
+      const spielbereit = termine.filter(t => jaSum(t.id) >= minSpieler).length;
       ws[encC(sumRow,4)] = cs(spielbereit, { font: hFont(JA_FG, true, 11), fill: hFill(JA_BG), alignment: hAlign("center","center") });
       for (let c = 5; c <= lastCol; c++) ws[encC(sumRow,c)] = cs('', { fill: hFill(NAVY2) });
 
@@ -183,7 +185,7 @@ async function exportExcel() {
 
     const heute    = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).replace(/\./g,'-');
     const dateiname = `FCStrass_Verfuegbarkeit_Vorrunde_${heute}.xlsx`;
-    XLSX.writeFile(wb, dateiname);
+    XLSX.writeFile(wb, dateiname, { cellStyles: true });
 
   } catch (err) {
     alert('Fehler beim Export: ' + err.message);
@@ -197,7 +199,7 @@ function ladeSheetJS() {
   return new Promise((resolve, reject) => {
     if (window.XLSX) { resolve(); return; }
     const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
     s.onload = resolve;
     s.onerror = () => reject(new Error('SheetJS konnte nicht geladen werden'));
     document.head.appendChild(s);
