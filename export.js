@@ -218,9 +218,10 @@ async function exportPDF() {
     await ladePDFLibs();
     const { jsPDF } = window.jspdf;
 
-    // Farben als RGB-Arrays
+    // Farben
     const NAVY    = [13,  27,  42];
     const NAVY2   = [21,  34,  50];
+    const NAVY3   = [30,  48,  72];
     const ORANGE  = [212, 98,  10];
     const TEAL    = [29,  158, 117];
     const PURPLE  = [83,  74,  183];
@@ -251,7 +252,11 @@ async function exportPDF() {
 
       function vorname(dbName) {
         const p = dbName.split(',');
-        return p.length === 2 ? p[1].trim().split(' ')[0] + ' ' + p[0].trim() : dbName;
+        if (p.length !== 2) return dbName;
+        const vn = p[1].trim().split(' ')[0];
+        const nn = p[0].trim();
+        // Vorname initial + Nachname
+        return vn.charAt(0) + '. ' + nn;
       }
 
       function getAntwort(terminId, spielerId) {
@@ -263,168 +268,228 @@ async function exportPDF() {
         return spieler.filter(sp => getAntwort(terminId, sp.id) === 'Ja').length;
       }
 
-      // Querformat für viele Spieler
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const PW = doc.internal.pageSize.getWidth();   // 297
-      const PH = doc.internal.pageSize.getHeight();  // 210
+      // ── Hochformat A4, eine Seite pro Mannschaft ──────
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const PW = doc.internal.pageSize.getWidth();   // 210
+      const PH = doc.internal.pageSize.getHeight();  // 297
+      const ML = 12; // margin left
+      const MR = 12; // margin right
+      const CW = PW - ML - MR; // content width = 186
 
-      // ── Header-Block ────────────────────────────────────
-      // Navy-Balken oben
+      // ── Seitenhintergrund ─────────────────────────────
       doc.setFillColor(...NAVY);
-      doc.rect(0, 0, PW, 22, 'F');
+      doc.rect(0, 0, PW, PH, 'F');
 
-      // Titel
+      // ── Header-Block ──────────────────────────────────
+      doc.setFillColor(...NAVY2);
+      doc.roundedRect(ML, 8, CW, 24, 3, 3, 'F');
+
+      // Oranger Akzentbalken links
+      doc.setFillColor(...ORANGE);
+      doc.roundedRect(ML, 8, 3, 24, 1, 1, 'F');
+
+      // FC Strass
       doc.setTextColor(...WHITE);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
-      doc.text('FC Strass e.V.', 10, 9);
+      doc.setFontSize(14);
+      doc.text('FC Strass e.V.', ML + 7, 17);
 
+      // Liga + Mannschaft
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(...MUTED);
-      doc.text(`Verfügbarkeit Vorrunde 2026/27  ·  ${mf.name}  ·  ${mf.liga}`, 10, 15);
-
-      // MF rechts
       doc.setFontSize(9);
-      doc.setTextColor(...ORANGE);
-      doc.text(`Mannschaftsführer: ${mf.mf_name || '–'}`, PW - 10, 9,  { align: 'right' });
-
-      // Legende rechts
       doc.setTextColor(...MUTED);
-      doc.text(`Mindest-Zusagen: ${minSpieler}  ·  ✓ Ja  ·  ? Vielleicht  ·  ✗ Nein  ·  – Offen`, PW - 10, 15, { align: 'right' });
+      doc.text('Verfuegbarkeit Vorrunde 2026/27', ML + 7, 24);
 
-      // Trennlinie
-      doc.setDrawColor(...ORANGE);
-      doc.setLineWidth(0.6);
-      doc.line(0, 22, PW, 22);
+      // Mannschaft rechts oben
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...ORANGE);
+      doc.text(mf.name, PW - MR, 17, { align: 'right' });
 
-      // ── Tabelle ─────────────────────────────────────────
-      const spielerNamen = spieler.map(sp => vorname(sp.name));
+      // Liga + MF rechts unten
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...MUTED);
+      doc.text(mf.liga + '  |  MF: ' + (mf.mf_name || '-'), PW - MR, 24, { align: 'right' });
 
-      const head = [['Datum', 'H/A', 'Gegner', 'Status', 'Σ Ja', ...spielerNamen]];
+      // ── Statistik-Zeile ───────────────────────────────
+      const spielbereit = termine.filter(t => jaSum(t.id) >= minSpieler).length;
+      const zuWenig     = termine.filter(t => {
+        const ja = jaSum(t.id);
+        return verfueg.some(v => v.spieltermin_id === t.id) && ja < minSpieler;
+      }).length;
 
-      const body = termine.map((t, ri) => {
-        const d   = new Date(t.datum);
-        const dt  = d.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'2-digit' });
+      const stats = [
+        { label: 'Spieltage',          value: String(termine.length),  bg: NAVY3,   fg: WHITE  },
+        { label: 'Spielbereit',         value: String(spielbereit),     bg: JA_BG,   fg: JA_FG  },
+        { label: 'Zu wenig Zusagen',    value: String(zuWenig),         bg: NEIN_BG, fg: NEIN_FG},
+        { label: 'Mind. Zusagen',       value: String(minSpieler),      bg: NAVY3,   fg: ORANGE },
+      ];
+
+      const statW = CW / stats.length;
+      stats.forEach((s, i) => {
+        const sx = ML + i * statW;
+        doc.setFillColor(...s.bg);
+        doc.roundedRect(sx, 36, statW - 2, 14, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(...s.fg);
+        doc.text(s.value, sx + statW / 2 - 1, 45, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(...MUTED);
+        doc.text(s.label.toUpperCase(), sx + statW / 2 - 1, 48.5, { align: 'center' });
+      });
+
+      // ── Legende ───────────────────────────────────────
+      const legendItems = [
+        { label: 'Ja',         bg: JA_BG,    fg: JA_FG   },
+        { label: 'Vielleicht', bg: VIEL_BG,  fg: VIEL_FG },
+        { label: 'Nein',       bg: NEIN_BG,  fg: NEIN_FG },
+        { label: 'Offen',      bg: OFFEN_BG, fg: OFFEN_FG},
+      ];
+      let lx = ML;
+      legendItems.forEach(l => {
+        doc.setFillColor(...l.bg);
+        doc.roundedRect(lx, 53, 22, 5, 1, 1, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(...l.fg);
+        doc.text(l.label, lx + 11, 56.5, { align: 'center' });
+        lx += 24;
+      });
+
+      // ── Spieltag-Cards ────────────────────────────────
+      let y = 62;
+      const CARD_PAD  = 3;
+      const PILL_H    = 6;
+      const PILL_PAD  = 2;
+
+      termine.forEach((t, ti) => {
         const ja  = jaSum(t.id);
         const hatAntworten = verfueg.some(v => v.spieltermin_id === t.id);
-        const antworten = spieler.map(sp => {
-          const a = getAntwort(t.id, sp.id);
-          return a === 'Ja' ? '✓' : a === 'Nein' ? '✗' : a === 'Vielleicht' ? '?' : '–';
-        });
-        return [
-          dt,
-          t.heim ? 'Heim' : 'Auswärts',
-          t.gegner,
-          t.status || 'Geplant',
-          hatAntworten ? String(ja) : '–',
-          ...antworten
-        ];
-      });
+        const d   = new Date(t.datum);
+        const wt  = d.toLocaleDateString('de-DE', { weekday: 'short' });
+        const dt  = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        const uhr = t.uhrzeit ? t.uhrzeit.slice(0,5) : '';
 
-      // Summenzeile
-      const spielbereit = termine.filter(t => jaSum(t.id) >= minSpieler).length;
-      body.push([
-        { content: `Spielbereit (≥${minSpieler} Ja):`, colSpan: 4, styles: { halign: 'right', fontStyle: 'bold', fillColor: NAVY, textColor: WHITE } },
-        { content: String(spielbereit), styles: { halign: 'center', fontStyle: 'bold', fillColor: JA_BG, textColor: JA_FG } },
-        ...spieler.map(() => ({ content: '', styles: { fillColor: NAVY2 } }))
-      ]);
+        // Ampelfarbe für die Card
+        let cardAccent;
+        if (!hatAntworten)         cardAccent = MUTED;
+        else if (ja >= minSpieler) cardAccent = TEAL;
+        else if (ja >= minSpieler - 2) cardAccent = [212, 160, 10];
+        else                       cardAccent = [200, 60, 60];
 
-      // Spaltenbreiten dynamisch
-      const fixedW = 26 + 16 + 42 + 18 + 12; // Datum+H/A+Gegner+Status+ΣJa
-      const spW = Math.max(10, Math.floor((PW - 20 - fixedW) / spieler.length));
+        // Card-Höhe dynamisch: Header-Zeile + Spieler-Pills
+        const pillsPerRow = Math.floor((CW - 2 * CARD_PAD - 55) / 30);
+        const pillRows    = Math.ceil(spieler.length / Math.max(pillsPerRow, 1));
+        const cardH       = 10 + pillRows * (PILL_H + 2) + CARD_PAD;
 
-      doc.autoTable({
-        head,
-        body,
-        startY: 25,
-        margin: { left: 10, right: 10 },
-        tableWidth: PW - 20,
-        styles: {
-          font: 'helvetica',
-          fontSize: 8,
-          cellPadding: { top: 2, bottom: 2, left: 2, right: 2 },
-          valign: 'middle',
-          overflow: 'linebreak'
-        },
-        headStyles: {
-          fillColor: NAVY,
-          textColor: WHITE,
-          fontStyle: 'bold',
-          halign: 'center',
-          fontSize: 8,
-          cellPadding: { top: 3, bottom: 3, left: 2, right: 2 }
-        },
-        columnStyles: {
-          0: { cellWidth: 26, halign: 'left',   fontStyle: 'bold', textColor: NAVY },
-          1: { cellWidth: 16, halign: 'center' },
-          2: { cellWidth: 42, halign: 'left',   fontStyle: 'bold', textColor: NAVY },
-          3: { cellWidth: 18, halign: 'center', fontSize: 7 },
-          4: { cellWidth: 12, halign: 'center', fontStyle: 'bold' },
-          ...Object.fromEntries(spieler.map((_, i) => [5 + i, { cellWidth: spW, halign: 'center', fontStyle: 'bold', fontSize: 9 }]))
-        },
-        alternateRowStyles: { fillColor: [245, 247, 252] },
-        didParseCell(data) {
-          const { row, column, cell } = data;
-          if (data.section === 'head') return;
-          if (row.index >= termine.length) return; // Summenzeile separat
-
-          const ri = row.index;
-          const t  = termine[ri];
-          if (!t) return;
-
-          // H/A Spalte färben
-          if (column.index === 1) {
-            cell.styles.fillColor = t.heim ? [238, 237, 254] : [250, 236, 231];
-            cell.styles.textColor = t.heim ? PURPLE : ORANGE;
-          }
-
-          // Status-Farbe
-          if (column.index === 3) {
-            if (t.status === 'Verschoben') cell.styles.textColor = ORANGE;
-            else if (t.status === 'Bestätigt') cell.styles.textColor = TEAL;
-            else cell.styles.textColor = MUTED;
-          }
-
-          // Σ Ja färben
-          if (column.index === 4) {
-            const hatAntworten = verfueg.some(v => v.spieltermin_id === t.id);
-            const ja = jaSum(t.id);
-            if (!hatAntworten) { cell.styles.fillColor = OFFEN_BG; cell.styles.textColor = OFFEN_FG; }
-            else if (ja >= minSpieler) { cell.styles.fillColor = JA_BG; cell.styles.textColor = JA_FG; }
-            else if (ja >= minSpieler - 2) { cell.styles.fillColor = VIEL_BG; cell.styles.textColor = VIEL_FG; }
-            else { cell.styles.fillColor = NEIN_BG; cell.styles.textColor = NEIN_FG; }
-          }
-
-          // Spieler-Antworten färben
-          if (column.index >= 5) {
-            const sp  = spieler[column.index - 5];
-            if (!sp) return;
-            const ant = getAntwort(t.id, sp.id);
-            if (ant === 'Ja')         { cell.styles.fillColor = JA_BG;   cell.styles.textColor = JA_FG; }
-            else if (ant === 'Nein')  { cell.styles.fillColor = NEIN_BG; cell.styles.textColor = NEIN_FG; }
-            else if (ant === 'Vielleicht') { cell.styles.fillColor = VIEL_BG; cell.styles.textColor = VIEL_FG; }
-            else                      { cell.styles.fillColor = OFFEN_BG; cell.styles.textColor = OFFEN_FG; }
-          }
-        },
-        didDrawPage(data) {
-          // Footer jede Seite
-          doc.setFontSize(7);
-          doc.setTextColor(...MUTED);
-          const now = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-          doc.text(`FC Strass e.V.  ·  ${mf.name}  ·  Erstellt: ${now}`, 10, PH - 5);
-          doc.text(`Seite ${doc.internal.getCurrentPageInfo().pageNumber}`, PW - 10, PH - 5, { align: 'right' });
-          // Trennlinie Footer
-          doc.setDrawColor(...NAVY2);
-          doc.setLineWidth(0.3);
-          doc.line(10, PH - 8, PW - 10, PH - 8);
+        // Seitenumbruch prüfen
+        if (y + cardH > PH - 14) {
+          doc.addPage();
+          doc.setFillColor(...NAVY);
+          doc.rect(0, 0, PW, PH, 'F');
+          y = 12;
         }
+
+        // Card-Hintergrund
+        doc.setFillColor(...NAVY2);
+        doc.roundedRect(ML, y, CW, cardH, 2, 2, 'F');
+
+        // Linker Akzentbalken (Ampelfarbe)
+        doc.setFillColor(...cardAccent);
+        doc.roundedRect(ML, y, 3, cardH, 1, 1, 'F');
+
+        // Datum + Uhrzeit
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...WHITE);
+        doc.text(wt + ' ' + dt, ML + 6, y + 6);
+
+        if (uhr) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(...MUTED);
+          doc.text(uhr + ' Uhr', ML + 6, y + 10.5);
+        }
+
+        // H/A Badge
+        const haX = ML + 32;
+        const haColor = t.heim ? PURPLE : ORANGE;
+        const haText  = t.heim ? 'HEIM' : 'AUSW';
+        doc.setFillColor(...haColor.map(c => Math.min(255, c + 160)));
+        doc.roundedRect(haX, y + 2.5, 13, 5, 1, 1, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6);
+        doc.setTextColor(...haColor);
+        doc.text(haText, haX + 6.5, y + 6.2, { align: 'center' });
+
+        // Gegner
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(...WHITE);
+        const gegnerX = haX + 16;
+        doc.text(t.gegner, gegnerX, y + 6, { maxWidth: CW - gegnerX + ML - 20 });
+
+        // Anzahl Ja – rechts
+        const jaColor = !hatAntworten ? OFFEN_FG : ja >= minSpieler ? JA_FG : ja < minSpieler - 2 ? NEIN_FG[0] ? NEIN_FG : NEIN_FG : VIEL_FG;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(13);
+        doc.setTextColor(...(ja >= minSpieler ? JA_FG : ja >= minSpieler - 2 ? VIEL_FG : hatAntworten ? NEIN_FG : OFFEN_FG));
+        doc.text(hatAntworten ? String(ja) : '-', PW - MR, y + 7, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(...MUTED);
+        doc.text('Ja', PW - MR, y + 10.5, { align: 'right' });
+
+        // ── Spieler-Pills ─────────────────────────────
+        const pillStartX = ML + CARD_PAD;
+        const pillW      = 29;
+        const pillsInRow = Math.floor((CW - 2 * CARD_PAD) / (pillW + 1));
+        let px = pillStartX;
+        let py = y + 12;
+
+        spieler.forEach((sp, si) => {
+          if (si > 0 && si % pillsInRow === 0) {
+            px  = pillStartX;
+            py += PILL_H + 2;
+          }
+
+          const ant = getAntwort(t.id, sp.id);
+          let pillBg, pillFg;
+          if (ant === 'Ja')         { pillBg = JA_BG;    pillFg = JA_FG;   }
+          else if (ant === 'Nein')  { pillBg = NEIN_BG;  pillFg = NEIN_FG; }
+          else if (ant === 'Vielleicht') { pillBg = VIEL_BG; pillFg = VIEL_FG; }
+          else                      { pillBg = NAVY3;    pillFg = MUTED;   }
+
+          doc.setFillColor(...pillBg);
+          doc.roundedRect(px, py, pillW, PILL_H, 1, 1, 'F');
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.5);
+          doc.setTextColor(...pillFg);
+          doc.text(vorname(sp.name), px + pillW / 2, py + 4, { align: 'center', maxWidth: pillW - 2 });
+
+          px += pillW + 1;
+        });
+
+        y += cardH + 3;
       });
 
-      // Pro Mannschaft eigene PDF-Datei
+      // ── Footer ────────────────────────────────────────
+      doc.setFontSize(7);
+      doc.setTextColor(...MUTED);
+      const now = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      doc.text('FC Strass e.V.  |  ' + mf.name + '  |  Erstellt: ' + now, ML, PH - 6);
+      doc.text('Seite 1', PW - MR, PH - 6, { align: 'right' });
+      doc.setDrawColor(...NAVY3);
+      doc.setLineWidth(0.3);
+      doc.line(ML, PH - 9, PW - MR, PH - 9);
+
       const heute = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).replace(/\./g,'-');
       const name  = mf.name.replace(/\./g,'').trim().replace(/\s+/g,'_');
-      doc.save(`FCStrass_${name}_Verfuegbarkeit_${heute}.pdf`);
+      doc.save('FCStrass_' + name + '_Verfuegbarkeit_' + heute + '.pdf');
     }
 
   } catch (err) {
@@ -438,17 +503,16 @@ async function exportPDF() {
 function ladePDFLibs() {
   return new Promise((resolve, reject) => {
     if (window.jspdf && window.jspdf.jsPDF) { resolve(); return; }
-
-    const jspdfScript = document.createElement('script');
-    jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    jspdfScript.onload = () => {
-      const atScript = document.createElement('script');
-      atScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
-      atScript.onload = resolve;
-      atScript.onerror = () => reject(new Error('autoTable konnte nicht geladen werden'));
-      document.head.appendChild(atScript);
+    const s1 = document.createElement('script');
+    s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s1.onload = () => {
+      const s2 = document.createElement('script');
+      s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+      s2.onload = resolve;
+      s2.onerror = () => reject(new Error('autoTable konnte nicht geladen werden'));
+      document.head.appendChild(s2);
     };
-    jspdfScript.onerror = () => reject(new Error('jsPDF konnte nicht geladen werden'));
-    document.head.appendChild(jspdfScript);
+    s1.onerror = () => reject(new Error('jsPDF konnte nicht geladen werden'));
+    document.head.appendChild(s1);
   });
 }
