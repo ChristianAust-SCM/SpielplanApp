@@ -233,7 +233,7 @@ function ladeExcelJS() {
   return new Promise((resolve, reject) => {
     if (window.ExcelJS) { resolve(); return; }
     const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.src = 'https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js';
     s.onload = resolve;
     s.onerror = () => reject(new Error('ExcelJS konnte nicht geladen werden'));
     document.head.appendChild(s);

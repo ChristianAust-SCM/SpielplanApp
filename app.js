@@ -7,8 +7,8 @@ const VEREIN_KUERZEL = 'fcstrass';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-let alleMannschaften = [];
-let aktiveMannschaft = null;
+var alleMannschaften = [];
+var aktiveMannschaft = null;
 let alleTermine      = [];
 let alleVerfueg      = [];
 let alleSpieler      = [];
@@ -319,7 +319,7 @@ function renderTabelle() {
             '</span>' +
           '</div>'
         : '<span style="font-size:13px;color:#8996B4;">–</span>') + altInfo + '</td>' +
-      '<td>' + (altTermineInfo.length > 0
+      '<td>' + (istAlternativ && altTermineInfo.length > 0
         ? rueckmeldungAlt(altTermineInfo)
         : rm
           ? '<button onclick="zeigeFehlende(\'' + t.id + '\',null)" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
