@@ -387,93 +387,93 @@ async function exportPDF() {
       lx += 28;
     });
 
-    // Cards
-    const PILL_H  = 6.5;
-    const pillW   = 30;
-    const pillsRow = Math.floor(CW / (pillW + 1));
+    // Cards – kompakt, eine Seite
+    // Dynamisch: verfügbare Höhe aufteilen
+    const availableH = PH - 62 - 10; // von y=62 bis Footer
+    const pillW      = 19;
+    const pillsRow   = Math.floor(CW / (pillW + 1));
+    const pillRows   = Math.ceil(spieler.length / pillsRow);
+    const PILL_H     = 5;
+    const cardH      = 8 + pillRows * (PILL_H + 1) + 2;
+    const gap        = Math.min(2, Math.floor((availableH - termine.length * cardH) / Math.max(termine.length, 1)));
     let y = 62;
 
     termine.forEach(t => {
-      const ja         = jaSum(t.id);
-      const hatAnt     = verfueg.some(v => v.spieltermin_id === t.id);
-      const d          = new Date(t.datum);
-      const wt         = d.toLocaleDateString('de-DE', { weekday: 'short' });
-      const dt         = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
-      const uhr        = t.uhrzeit ? t.uhrzeit.slice(0, 5) : '';
-      const pillRows   = Math.ceil(spieler.length / pillsRow);
-      const cardH      = 13 + pillRows * (PILL_H + 2) + 3;
-      const accent     = !hatAnt ? MUTED : ja >= minSpieler ? TEAL : ja >= minSpieler - 2 ? [212, 160, 10] : [200, 60, 60];
+      const ja     = jaSum(t.id);
+      const hatAnt = verfueg.some(v => v.spieltermin_id === t.id);
+      const d      = new Date(t.datum);
+      const wt     = d.toLocaleDateString('de-DE', { weekday: 'short' });
+      const dt     = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      const uhr    = t.uhrzeit ? t.uhrzeit.slice(0, 5) : '';
+      const accent = !hatAnt ? MUTED : ja >= minSpieler ? TEAL : ja >= minSpieler - 2 ? [212, 160, 10] : [200, 60, 60];
 
-      if (y + cardH > PH - 14) {
-        drawFooter();
-        doc.addPage();
-        drawPageBase();
-        y = 10;
-      }
-
-      // Card
+      // Card Hintergrund
       doc.setFillColor(...NAVY2);
-      doc.roundedRect(ML, y, CW, cardH, 2, 2, 'F');
+      doc.roundedRect(ML, y, CW, cardH, 1.5, 1.5, 'F');
+
+      // Akzentbalken links (Ampelfarbe)
       doc.setFillColor(...accent);
-      doc.rect(ML, y, 3, cardH, 'F');
+      doc.rect(ML, y, 2.5, cardH, 'F');
 
       // Datum
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(7.5);
       doc.setTextColor(...WHITE);
-      doc.text(wt + ' ' + dt, ML + 6, y + 6);
+      doc.text(wt + ' ' + dt, ML + 5, y + 5.5);
+
+      // Uhrzeit
       if (uhr) {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
+        doc.setFontSize(6);
         doc.setTextColor(...MUTED);
-        doc.text(uhr + ' Uhr', ML + 6, y + 10.5);
+        doc.text(uhr, ML + 5, y + 9);
       }
 
-      // H/A
+      // H/A Badge
       const haColor = t.heim ? PURPLE : ORANGE;
-      const haText  = t.heim ? 'HEIM' : 'AUSW';
-      doc.setFillColor(...haColor.map(c => Math.min(255, c + 150)));
-      doc.roundedRect(ML + 33, y + 2.5, 14, 5.5, 1, 1, 'F');
+      const haText  = t.heim ? 'H' : 'A';
+      doc.setFillColor(...haColor.map(c => Math.min(255, c + 140)));
+      doc.roundedRect(ML + 28, y + 1.5, 6, 5, 1, 1, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
       doc.setTextColor(...haColor);
-      doc.text(haText, ML + 40, y + 6.3, { align: 'center' });
+      doc.text(haText, ML + 31, y + 5.2, { align: 'center' });
 
       // Gegner
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
+      doc.setFontSize(8);
       doc.setTextColor(...WHITE);
-      doc.text(t.gegner, ML + 51, y + 6, { maxWidth: CW - 65 });
+      doc.text(t.gegner, ML + 37, y + 5.5, { maxWidth: CW - 55 });
 
       // Ja-Zahl rechts
       const jaFgC = !hatAnt ? OFFEN_FG : ja >= minSpieler ? JA_FG : ja >= minSpieler - 2 ? VIEL_FG : NEIN_FG;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
+      doc.setFontSize(11);
       doc.setTextColor(...jaFgC);
-      doc.text(hatAnt ? String(ja) : '-', PW - MR, y + 7, { align: 'right' });
+      doc.text(hatAnt ? String(ja) : '-', PW - MR, y + 6, { align: 'right' });
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6);
+      doc.setFontSize(5.5);
       doc.setTextColor(...MUTED);
-      doc.text('von ' + minSpieler, PW - MR, y + 11, { align: 'right' });
+      doc.text('/' + minSpieler, PW - MR, y + 9.5, { align: 'right' });
 
       // Spieler-Pills
       let px = ML + 3;
-      let py = y + 13;
+      let py = y + 9;
       spieler.forEach((sp, si) => {
-        if (si > 0 && si % pillsRow === 0) { px = ML + 3; py += PILL_H + 2; }
-        const ant = getAntwort(t.id, sp.id);
+        if (si > 0 && si % pillsRow === 0) { px = ML + 3; py += PILL_H + 1; }
+        const ant    = getAntwort(t.id, sp.id);
         const pillBg = ant === 'Ja' ? JA_BG : ant === 'Nein' ? NEIN_BG : ant === 'Vielleicht' ? VIEL_BG : OFFEN_BG;
         const pillFg = ant === 'Ja' ? JA_FG : ant === 'Nein' ? NEIN_FG : ant === 'Vielleicht' ? VIEL_FG : OFFEN_FG;
         doc.setFillColor(...pillBg);
-        doc.roundedRect(px, py, pillW, PILL_H, 1, 1, 'F');
+        doc.roundedRect(px, py, pillW, PILL_H, 0.8, 0.8, 'F');
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(6.5);
+        doc.setFontSize(5.5);
         doc.setTextColor(...pillFg);
-        doc.text(_vorname(sp.name), px + pillW / 2, py + 4.3, { align: 'center', maxWidth: pillW - 2 });
+        doc.text(_vorname(sp.name), px + pillW / 2, py + 3.5, { align: 'center', maxWidth: pillW - 1 });
         px += pillW + 1;
       });
 
-      y += cardH + 3;
+      y += cardH + gap;
     });
 
     drawFooter();
