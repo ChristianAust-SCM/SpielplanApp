@@ -232,7 +232,10 @@ async function exportPDF() {
     const VIEL_BG = [255, 240, 192]; const VIEL_FG = [133, 79,  11];
     const OFFEN_BG= [235, 235, 235]; const OFFEN_FG= [136, 136, 136];
 
-    for (const mf of alleMannschaften) {
+    const mf = alleMannschaften.find(m => m.id === aktiveMannschaftId) || alleMannschaften[0];
+    if (!mf) throw new Error('Keine Mannschaft gefunden');
+
+    {
       const [termRes, spRes] = await Promise.all([
         sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
         sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('name')
@@ -255,7 +258,6 @@ async function exportPDF() {
         if (p.length !== 2) return dbName;
         const vn = p[1].trim().split(' ')[0];
         const nn = p[0].trim();
-        // Vorname initial + Nachname
         return vn.charAt(0) + '. ' + nn;
       }
 
