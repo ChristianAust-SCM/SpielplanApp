@@ -48,7 +48,9 @@ async function exportExcel() {
       return { top: s, bottom: s, left: s, right: s };
     }
 
-    for (const mf of alleMannschaften) {
+    const _mf = aktiveMannschaft || alleMannschaften[0];
+    if (!_mf) throw new Error('Keine Mannschaft aktiv');
+    for (const mf of [_mf]) {
       const [termRes, spRes] = await Promise.all([
         sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
         sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('name')
@@ -505,4 +507,385 @@ function ladePDFLibs() {
     s1.onerror = () => reject(new Error('jsPDF konnte nicht geladen werden'));
     document.head.appendChild(s1);
   });
+}
+
+// ============================================================
+// AUFSTELLUNGS-EXPORT · PDF (Card-Layout)
+// ============================================================
+
+async function exportAufstellungPDF() {
+  try {
+    await ladePDFLibs();
+    const { jsPDF } = window.jspdf;
+
+    const NAVY   = [13,27,42],  NAVY2 = [21,34,50], NAVY3 = [30,48,72];
+    const ORANGE = [212,98,10], TEAL  = [29,158,117], PURPLE = [83,74,183];
+    const WHITE  = [247,249,255], MUTED = [137,150,180];
+    const OFFEN_BG = [235,235,235], OFFEN_FG = [136,136,136];
+    const SET_BG = [212,240,228], SET_FG = [15,110,86];
+
+    const mf = aktiveMannschaft || alleMannschaften[0];
+    if (!mf) throw new Error('Keine Mannschaft aktiv');
+
+    const [termRes, spRes] = await Promise.all([
+      sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
+      sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('position')
+    ]);
+    const termine = termRes.data || [];
+    const spieler = spRes.data || [];
+    let aufstellungen = [];
+    if (termine.length > 0) {
+      const { data: ad } = await sb.from('aufstellungen').select('*').in('spieltermin_id', termine.map(t => t.id));
+      aufstellungen = ad || [];
+    }
+
+    const minSp = mf.min_spieler || 6;
+    const spielerById = Object.fromEntries(spieler.map(s => [s.id, s]));
+
+    function aufstellungFuer(tid) {
+      return aufstellungen
+        .filter(a => a.spieltermin_id === tid)
+        .map(a => spielerById[a.spieler_id])
+        .filter(Boolean)
+        .sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
+    }
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const PW = doc.internal.pageSize.getWidth();
+    const PH = doc.internal.pageSize.getHeight();
+    const ML = 12, MR = 12, CW = PW - ML - MR;
+
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, PW, PH, 'F');
+
+    // Header
+    doc.setFillColor(...NAVY2);
+    doc.roundedRect(ML, 8, CW, 24, 3, 3, 'F');
+    doc.setFillColor(...ORANGE);
+    doc.rect(ML, 8, 3, 24, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('FC Strass e.V.', ML + 7, 17);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...MUTED);
+    doc.text('Einsatzplan / Aufstellung Vorrunde 2026/27', ML + 7, 24);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...ORANGE);
+    doc.text(mf.name, PW - MR, 17, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    doc.text(mf.liga + '  |  MF: ' + (mf.mf_name || '-'), PW - MR, 24, { align: 'right' });
+
+    let y = 40;
+
+    termine.forEach(t => {
+      const auf = aufstellungFuer(t.id);
+      const gesetzt = auf.length > 0;
+      const d   = new Date(t.datum);
+      const wt  = d.toLocaleDateString('de-DE', { weekday: 'short' });
+      const dt  = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      const uhr = t.uhrzeit ? t.uhrzeit.slice(0, 5) : '';
+
+      const rows = Math.max(1, Math.ceil(auf.length / 2));
+      const cardH = 13 + (gesetzt ? rows * 7 + 2 : 8);
+
+      if (y + cardH > PH - 14) {
+        doc.setFontSize(7); doc.setTextColor(...MUTED);
+        doc.text('FC Strass e.V.  |  ' + mf.name, ML, PH - 6);
+        doc.addPage();
+        doc.setFillColor(...NAVY); doc.rect(0, 0, PW, PH, 'F');
+        y = 12;
+      }
+
+      const accent = gesetzt ? TEAL : MUTED;
+      doc.setFillColor(...NAVY2);
+      doc.roundedRect(ML, y, CW, cardH, 2, 2, 'F');
+      doc.setFillColor(...accent);
+      doc.rect(ML, y, 3, cardH, 'F');
+
+      // Datum + Uhrzeit
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...WHITE);
+      doc.text(wt + ' ' + dt, ML + 6, y + 6);
+      if (uhr) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(...MUTED);
+        doc.text(uhr, ML + 6, y + 10);
+      }
+
+      // H/A
+      const haColor = t.heim ? PURPLE : ORANGE;
+      doc.setFillColor(...haColor.map(c => Math.min(255, c + 150)));
+      doc.roundedRect(ML + 28, y + 2, 6, 5, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(...haColor);
+      doc.text(t.heim ? 'H' : 'A', ML + 31, y + 5.7, { align: 'center' });
+
+      // Gegner
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...WHITE);
+      doc.text(t.gegner, ML + 37, y + 6, { maxWidth: CW - 60 });
+
+      // Status rechts
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      if (gesetzt) {
+        doc.setTextColor(...SET_FG);
+        doc.text(auf.length + '/' + minSp + ' gesetzt', PW - MR, y + 6, { align: 'right' });
+      } else {
+        doc.setTextColor(...OFFEN_FG);
+        doc.text('offen', PW - MR, y + 6, { align: 'right' });
+      }
+
+      // Spieler-Reihen (2 Spalten, Positionsnummer + Name)
+      if (gesetzt) {
+        const colW = (CW - 8) / 2;
+        auf.forEach((sp, i) => {
+          const col = i % 2;
+          const rowIdx = Math.floor(i / 2);
+          const px = ML + 4 + col * colW;
+          const py = y + 12 + rowIdx * 7;
+
+          doc.setFillColor(...SET_BG);
+          doc.roundedRect(px, py, colW - 2, 6, 1, 1, 'F');
+          // Positionsnummer
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.setTextColor(...ORANGE);
+          doc.text((sp.position ?? '-') + '.', px + 3, py + 4);
+          // Name
+          doc.setTextColor(...SET_FG);
+          doc.setFontSize(7.5);
+          const nm = _vornameVoll(sp.name);
+          doc.text(nm, px + 9, py + 4, { maxWidth: colW - 26 });
+          // TTR
+          if (sp.ttr != null) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(6.5);
+            doc.setTextColor(...MUTED);
+            doc.text(String(sp.ttr), px + colW - 4, py + 4, { align: 'right' });
+          }
+        });
+      } else {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...MUTED);
+        doc.text('Noch keine Aufstellung festgelegt', ML + 6, y + 15);
+      }
+
+      y += cardH + 3;
+    });
+
+    // Footer
+    doc.setFontSize(7);
+    doc.setTextColor(...MUTED);
+    const now = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    doc.text('FC Strass e.V.  |  ' + mf.name + '  |  Einsatzplan  |  ' + now, ML, PH - 6);
+
+    const heute = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).replace(/\./g,'-');
+    const name  = mf.name.replace(/\./g,'').trim().replace(/\s+/g,'_');
+    doc.save('FCStrass_' + name + '_Einsatzplan_' + heute + '.pdf');
+
+  } catch (err) {
+    alert('Fehler beim Aufstellungs-PDF: ' + err.message);
+    console.error(err);
+  }
+}
+
+// ============================================================
+// AUFSTELLUNGS-EXPORT · Excel
+// ============================================================
+
+async function exportAufstellungExcel() {
+  try {
+    await ladeExcelJS();
+    const ExcelJS = window.ExcelJS;
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'SpielplanApp FC Strass';
+
+    const NAVY = '0D1B2A', NAVY2 = '152232', ORANGE = 'D4620A', WHITE = 'F7F9FF', MUTED = '8996B4';
+    const TEAL = '1D9E75', PURPLE = '534AB7';
+    const SET_BG = 'D4F0E4', SET_FG = '0F6E56', OFF_BG = 'E8E8E8', OFF_FG = '888888';
+
+    function fill(hex){ return { type:'pattern', pattern:'solid', fgColor:{argb:'FF'+hex} }; }
+    function font(hex,bold,sz){ return { color:{argb:'FF'+hex}, bold:!!bold, size:sz||10, name:'Calibri' }; }
+    function align(h,v){ return { horizontal:h||'left', vertical:v||'middle' }; }
+    function border(){ return { bottom:{style:'thin',color:{argb:'FFDDDDDD'}} }; }
+
+    const mf = aktiveMannschaft || alleMannschaften[0];
+    if (!mf) throw new Error('Keine Mannschaft aktiv');
+
+    const [termRes, spRes] = await Promise.all([
+      sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
+      sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('position')
+    ]);
+    const termine = termRes.data || [];
+    const spieler = spRes.data || [];
+    let aufstellungen = [];
+    if (termine.length > 0) {
+      const { data: ad } = await sb.from('aufstellungen').select('*').in('spieltermin_id', termine.map(t => t.id));
+      aufstellungen = ad || [];
+    }
+
+    const minSp = mf.min_spieler || 6;
+    const spielerById = Object.fromEntries(spieler.map(s => [s.id, s]));
+    function aufstellungFuer(tid) {
+      return aufstellungen.filter(a => a.spieltermin_id === tid)
+        .map(a => spielerById[a.spieler_id]).filter(Boolean)
+        .sort((a,b) => (a.position ?? 99) - (b.position ?? 99));
+    }
+
+    const ws = wb.addWorksheet('Einsatzplan', { views:[{state:'frozen', ySplit:4}] });
+    // Spalten: Datum | H/A | Gegner | Status | Pos1..PosN
+    ws.columns = [
+      { width: 14 }, { width: 10 }, { width: 30 }, { width: 13 },
+      ...Array.from({length: minSp}, () => ({ width: 20 }))
+    ];
+
+    // Titel
+    ws.mergeCells(1,1,1,4+minSp);
+    const t1 = ws.getCell('A1');
+    t1.value = `FC Strass e.V.  ·  Einsatzplan Vorrunde 2026/27  ·  ${mf.name}  ·  ${mf.liga}`;
+    t1.font = font(WHITE,true,13); t1.fill = fill(NAVY); t1.alignment = align('left');
+    ws.getRow(1).height = 30;
+
+    // MF-Zeile
+    ws.mergeCells(2,1,2,4+minSp);
+    const t2 = ws.getCell('A2');
+    t2.value = `Mannschaftsführer: ${mf.mf_name || '–'}  ·  Aufstellung in Meldereihenfolge (Position)`;
+    t2.font = font(ORANGE,true,9); t2.fill = fill(NAVY2); t2.alignment = align('left');
+    ws.getRow(2).height = 16;
+
+    // Trenner
+    for (let c=1;c<=4+minSp;c++){ const cell=ws.getCell(3,c); cell.fill=fill(NAVY2); }
+    ws.getRow(3).height = 4;
+
+    // Header
+    const headers = ['Datum','H/A','Gegner','Status'];
+    for (let i=0;i<minSp;i++) headers.push('Pos ' + (i+1));
+    headers.forEach((h,i)=>{
+      const cell = ws.getCell(4,i+1);
+      cell.value = h; cell.font = font(WHITE,true,10); cell.fill = fill(NAVY);
+      cell.alignment = align('center'); cell.border = border();
+    });
+    ws.getRow(4).height = 24;
+
+    // Datenzeilen
+    termine.forEach((t,ri)=>{
+      const row = ws.getRow(5+ri);
+      row.height = 20;
+      const auf = aufstellungFuer(t.id);
+      const gesetzt = auf.length > 0;
+      const d = new Date(t.datum);
+      const dt = d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'2-digit'});
+      const rowBg = ri%2===0 ? 'F0F4F8':'FFFFFF';
+
+      const cDat = row.getCell(1);
+      cDat.value = dt; cDat.font = font(NAVY,true,10); cDat.fill = fill(rowBg); cDat.alignment = align('left'); cDat.border = border();
+
+      const cHA = row.getCell(2);
+      cHA.value = t.heim?'Heim':'Auswärts'; cHA.font = font(t.heim?PURPLE:ORANGE,true,9);
+      cHA.fill = fill(t.heim?'EEEDFE':'FAECE7'); cHA.alignment = align('center'); cHA.border = border();
+
+      const cGeg = row.getCell(3);
+      cGeg.value = t.gegner; cGeg.font = font(NAVY,true,10); cGeg.fill = fill(rowBg); cGeg.alignment = align('left'); cGeg.border = border();
+
+      const cSt = row.getCell(4);
+      cSt.value = gesetzt ? (auf.length+'/'+minSp) : 'offen';
+      cSt.font = font(gesetzt?SET_FG:OFF_FG,true,9); cSt.fill = fill(gesetzt?SET_BG:OFF_BG);
+      cSt.alignment = align('center'); cSt.border = border();
+
+      for (let i=0;i<minSp;i++){
+        const sp = auf[i];
+        const cell = row.getCell(5+i);
+        if (sp) {
+          cell.value = (sp.position!=null?sp.position+'. ':'') + _vornameVoll(sp.name) + (sp.ttr!=null?' ('+sp.ttr+')':'');
+          cell.font = font(SET_FG,false,9); cell.fill = fill(SET_BG);
+        } else {
+          cell.value = '–'; cell.font = font(OFF_FG,false,9); cell.fill = fill(rowBg);
+        }
+        cell.alignment = align('left'); cell.border = border();
+      }
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const heute = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
+    const name = mf.name.replace(/\./g,'').trim().replace(/\s+/g,'_');
+    a.href = url; a.download = 'FCStrass_' + name + '_Einsatzplan_' + heute + '.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+
+  } catch (err) {
+    alert('Fehler beim Aufstellungs-Excel: ' + err.message);
+    console.error(err);
+  }
+}
+
+// ============================================================
+// EXPORT-MENÜ · Auswahl was + Format
+// ============================================================
+
+function zeigeExportMenu() {
+  // vorhandenes Menü entfernen (Toggle)
+  const bestehend = document.getElementById('export-menu-overlay');
+  if (bestehend) { bestehend.remove(); return; }
+
+  const mfName = (aktiveMannschaft && aktiveMannschaft.name) || 'Mannschaft';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'export-menu-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px';
+
+  function opt(label, sub, farbe, fn) {
+    return '<button data-fn="' + fn + '" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;padding:14px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:#1e3550;cursor:pointer;text-align:left;transition:all 140ms" ' +
+      'onmouseover="this.style.background=\'#2a445f\';this.style.borderColor=\'' + farbe + '\'" onmouseout="this.style.background=\'#1e3550\';this.style.borderColor=\'rgba(255,255,255,0.12)\'">' +
+      '<span style="font-size:14px;font-weight:700;color:#F7F9FF">' + label + '</span>' +
+      '<span style="font-size:11px;color:#8996B4">' + sub + '</span>' +
+    '</button>';
+  }
+
+  overlay.innerHTML =
+    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.14);border-radius:16px;max-width:420px;width:100%;overflow:hidden">' +
+      '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">' +
+        '<div>' +
+          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:#F07830">Export</div>' +
+          '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + mfName + ' · aktueller Tab</div>' +
+        '</div>' +
+        '<button onclick="document.getElementById(\'export-menu-overlay\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
+      '</div>' +
+      '<div style="padding:16px 20px">' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Abstimmung (Verfügbarkeit)</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">' +
+          opt('PDF', 'Karten-Layout', '#D4620A', 'exportPDF') +
+          opt('Excel', 'Tabelle farbig', '#1D9E75', 'exportExcel') +
+        '</div>' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Einsatzplan (Aufstellung)</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+          opt('PDF', 'Karten-Layout', '#D4620A', 'exportAufstellungPDF') +
+          opt('Excel', 'Tabelle farbig', '#1D9E75', 'exportAufstellungExcel') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+
+  overlay.querySelectorAll('button[data-fn]').forEach(b => {
+    b.addEventListener('click', () => {
+      const fn = b.getAttribute('data-fn');
+      overlay.remove();
+      if (typeof window[fn] === 'function') window[fn]();
+    });
+  });
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
