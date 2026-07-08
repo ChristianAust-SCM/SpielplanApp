@@ -67,7 +67,7 @@ async function exportExcel() {
       const minSp = mf.min_spieler || 6;
 
       function getAntwort(tid, sid) {
-        const v = verfueg.find(v => v.spieltermin_id === tid && v.spieler_id === sid);
+        const v = verfueg.find(v => v.spieltermin_id === tid && v.spieler_id === sid && (v.alternativtermin_id === null || v.alternativtermin_id === undefined));
         return v ? v.antwort : '';
       }
       function jaSum(tid) {
@@ -287,7 +287,7 @@ async function exportPDF() {
     const minSpieler = mf.min_spieler || 6;
 
     function getAntwort(tid, sid) {
-      const v = verfueg.find(v => v.spieltermin_id === tid && v.spieler_id === sid);
+      const v = verfueg.find(v => v.spieltermin_id === tid && v.spieler_id === sid && (v.alternativtermin_id === null || v.alternativtermin_id === undefined));
       return v ? v.antwort : '';
     }
     function jaSum(tid) {

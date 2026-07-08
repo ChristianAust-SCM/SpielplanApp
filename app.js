@@ -7,8 +7,8 @@ const VEREIN_KUERZEL = 'fcstrass';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-var alleMannschaften = [];
-var aktiveMannschaft = null;
+let alleMannschaften = [];
+let aktiveMannschaft = null;
 let alleTermine      = [];
 let alleVerfueg      = [];
 let alleSpieler      = [];
@@ -152,7 +152,9 @@ function renderStats() {
 
 function zaehleAntworten(terminId, antwort) {
   return alleVerfueg.filter(v =>
-    v.spieltermin_id === terminId && v.antwort === antwort
+    v.spieltermin_id === terminId &&
+    v.antwort === antwort &&
+    (v.alternativtermin_id === null || v.alternativtermin_id === undefined)
   ).length;
 }
 
