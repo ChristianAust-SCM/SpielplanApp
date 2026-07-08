@@ -7,12 +7,13 @@ const VEREIN_KUERZEL = 'fcstrass';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-let alleMannschaften = [];
-let aktiveMannschaft = null;
+var alleMannschaften = [];
+var aktiveMannschaft = null;
 let alleTermine      = [];
 let alleVerfueg      = [];
 let alleSpieler      = [];
 let alleAlternativtermine = [];
+let alleAufstellungen = [];
 let istAdmin         = false;
 
 async function init() {
@@ -108,15 +109,18 @@ async function ladeMannschaft(mannschaftId) {
 
   if (alleTermine.length > 0) {
     const ids = alleTermine.map(t => t.id);
-    const [verfRes, altRes] = await Promise.all([
+    const [verfRes, altRes, aufRes] = await Promise.all([
       sb.from('verfuegbarkeiten').select('*').in('spieltermin_id', ids),
-      sb.from('alternativtermine').select('*').in('spieltermin_id', ids).order('datum')
+      sb.from('alternativtermine').select('*').in('spieltermin_id', ids).order('datum'),
+      sb.from('aufstellungen').select('*').in('spieltermin_id', ids)
     ]);
     alleVerfueg = verfRes.data || [];
     alleAlternativtermine = altRes.data || [];
+    alleAufstellungen = aufRes.data || [];
   } else {
     alleVerfueg = [];
     alleAlternativtermine = [];
+    alleAufstellungen = [];
   }
 
   renderStats();
@@ -302,12 +306,17 @@ function renderTabelle() {
       ? '<button class="btn-verschiebung aktiv" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')" title="' + (t.status === 'Verschiebung nötig' ? 'Alternativtermin läuft' : 'Alternativtermin') + '">↔</button>'
       : '<a class="btn-icon-link" href="' + abfrageLink + '" target="_blank" title="Link öffnen" aria-label="Link öffnen">🔗</a>' +
         '<button class="btn-icon-wa" onclick="kopierenWA(this, \'' + waText.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')" title="WhatsApp-Text kopieren" aria-label="WhatsApp"><svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.914 0C5.34 0 0 5.34 0 11.914c0 2.11.549 4.094 1.508 5.818L0 24l6.459-1.474a11.882 11.882 0 005.455 1.32c6.573 0 11.914-5.34 11.914-11.914C23.828 5.34 18.487 0 11.914 0zm0 21.828a9.914 9.914 0 01-5.032-1.369l-.361-.214-3.734.852.87-3.638-.235-.374A9.865 9.865 0 012 11.914C2 6.443 6.443 2 11.914 2c5.472 0 9.914 4.443 9.914 9.914 0 5.472-4.442 9.914-9.914 9.914z"/></svg></button>' +
-        '<button class="btn-icon-alt" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')" title="Alternativtermin" aria-label="Alternativtermin">↔</button>';
+        '<button class="btn-icon-alt" onclick="meldeVerschiebung(\'' + t.id + '\', \'' + t.status + '\')" title="Alternativtermin" aria-label="Alternativtermin">↔</button>' +
+        '<button class="btn-icon-auf" onclick="zeigeAufstellung(\'' + t.id + '\')" title="Aufstellung" aria-label="Aufstellung" style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:1px solid rgba(29,158,117,0.4);background:rgba(29,158,117,0.15);color:#4FD4A8;font-size:13px;cursor:pointer;padding:0">👥</button>';
 
     return '<tr style="' + rowStyle + '">' +
       '<td>' + datumBlock + '</td>' +
       '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
-      '<td style="font-weight:700">' + t.gegner + '</td>' +
+      '<td style="font-weight:700">' + t.gegner +
+        (alleAufstellungen.some(a => a.spieltermin_id === t.id)
+          ? '<span title="Aufstellung gesetzt" style="display:inline-flex;align-items:center;gap:3px;margin-left:8px;padding:1px 7px;border-radius:8px;background:rgba(29,158,117,0.18);color:#4FD4A8;font-size:10px;font-weight:700;vertical-align:middle">👥 Aufstellung</span>'
+          : '') +
+      '</td>' +
       '<td>' + (txt
         ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">' +
             '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;background:#E1F5EE;font-size:12px;font-weight:700;color:#085041">' +
@@ -669,6 +678,137 @@ async function _verschiebungFertigstellen(terminId, datum, uhrzeit) {
   document.querySelector('[style*="fixed"]')?.remove();
   await ladeMannschaft(aktiveMannschaft.id);
   alert('✓ Termin bestätigt. Der MF kann jetzt den neuen WhatsApp-Link schicken.');
+}
+
+// ============================================================
+// Aufstellung – Modal
+// ============================================================
+function zeigeAufstellung(terminId) {
+  const termin = alleTermine.find(t => t.id === terminId);
+  if (!termin) return;
+
+  const min = aktiveMannschaft?.min_spieler || 6;
+
+  function vorname(n) { const p = n.split(','); return p.length===2 ? p[1].trim()+' '+p[0].trim() : n; }
+  function posLabel(sp) { return sp.position != null ? sp.position + '.' : '–'; }
+
+  const antwortVon = (sid) => {
+    const v = alleVerfueg.find(v => v.spieltermin_id === terminId && v.spieler_id === sid && (v.alternativtermin_id === null || v.alternativtermin_id === undefined));
+    return v ? v.antwort : '';
+  };
+
+  const waehlbar = alleSpieler
+    .filter(s => { const a = antwortVon(s.id); return a === 'Ja' || a === 'Vielleicht'; })
+    .sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
+
+  const gesetzt = new Set(
+    alleAufstellungen.filter(a => a.spieltermin_id === terminId).map(a => a.spieler_id)
+  );
+
+  const d = new Date(termin.datum).toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit' }) +
+            (termin.uhrzeit ? ' · ' + termin.uhrzeit.slice(0,5) + ' Uhr' : '');
+  const titel = 'Aufstellung · ' + (termin.heim?'Heim':'Auswärts') + ' gegen ' + termin.gegner;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px';
+
+  function spielerRow(s) {
+    const a = antwortVon(s.id);
+    const antFarbe = a === 'Ja' ? '#4FD4A8' : '#F0C060';
+    const checked = gesetzt.has(s.id) ? 'checked' : '';
+    return '<label class="auf-row" data-sid="' + s.id + '" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#1e3048;border-radius:8px;margin-bottom:6px;cursor:pointer">' +
+      '<input type="checkbox" class="auf-check" value="' + s.id + '" ' + checked + ' style="width:18px;height:18px;accent-color:#1D9E75;cursor:pointer;flex-shrink:0">' +
+      '<span style="font-family:IBM Plex Mono,monospace;font-size:12px;font-weight:700;color:#F07830;min-width:26px">' + posLabel(s) + '</span>' +
+      '<span style="flex:1;font-size:14px;color:#F7F9FF">' + vorname(s.name) + '</span>' +
+      '<span style="font-size:11px;font-weight:700;color:' + antFarbe + '">' + a + '</span>' +
+      (s.ttr != null ? '<span style="font-size:11px;color:#8996B4;font-family:monospace;min-width:34px;text-align:right">' + s.ttr + '</span>' : '<span style="min-width:34px"></span>') +
+    '</label>';
+  }
+
+  const listeHtml = waehlbar.length === 0
+    ? '<div style="font-size:13px;color:#8996B4;padding:16px 0;text-align:center">Noch keine Ja/Vielleicht-Zusagen für diesen Spieltag.</div>'
+    : waehlbar.map(spielerRow).join('');
+
+  modal.innerHTML =
+    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:500px;width:100%;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column">' +
+      '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232;z-index:2">' +
+        '<div>' +
+          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:#F07830">' + titel + '</div>' +
+          '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + d + '</div>' +
+        '</div>' +
+        '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
+      '</div>' +
+      '<div style="padding:16px 20px;flex:1">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4">Verfügbare Spieler (Ja / Vielleicht)</div>' +
+          '<div id="auf-counter" style="font-size:12px;font-weight:700;color:#8996B4">0 / ' + min + '</div>' +
+        '</div>' +
+        listeHtml +
+      '</div>' +
+      '<div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:#152232">' +
+        '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="padding:9px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#8996B4;font-size:13px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">Abbrechen</button>' +
+        '<button id="auf-save" onclick="speichereAufstellung(\'' + terminId + '\', this)" style="padding:9px 18px;border-radius:8px;border:none;background:#1D9E75;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">Aufstellung speichern</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+
+  const checks = () => Array.from(modal.querySelectorAll('.auf-check'));
+  const counter = modal.querySelector('#auf-counter');
+  const saveBtn = modal.querySelector('#auf-save');
+
+  function updateCounter() {
+    const n = checks().filter(c => c.checked).length;
+    counter.textContent = n + ' / ' + min;
+    counter.style.color = n === min ? '#4FD4A8' : n > min ? '#F08080' : '#8996B4';
+    saveBtn.disabled = (n !== min);
+    saveBtn.style.opacity = (n === min) ? '1' : '0.5';
+    saveBtn.style.cursor  = (n === min) ? 'pointer' : 'not-allowed';
+  }
+
+  checks().forEach(c => c.addEventListener('change', () => {
+    const n = checks().filter(x => x.checked).length;
+    if (n > min) { c.checked = false; return; }
+    updateCounter();
+  }));
+
+  updateCounter();
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+async function speichereAufstellung(terminId, btn) {
+  const modal = btn.closest('[style*=fixed]');
+  const gewaehlt = Array.from(modal.querySelectorAll('.auf-check'))
+    .filter(c => c.checked).map(c => c.value);
+
+  const min = aktiveMannschaft?.min_spieler || 6;
+  if (gewaehlt.length !== min) {
+    alert('Bitte genau ' + min + ' Spieler auswählen.');
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Speichert...';
+
+  try {
+    const { error: delErr } = await sb.from('aufstellungen')
+      .delete().eq('spieltermin_id', terminId);
+    if (delErr) throw delErr;
+
+    const rows = gewaehlt.map(sid => ({ spieltermin_id: terminId, spieler_id: sid }));
+    const { error: insErr } = await sb.from('aufstellungen').insert(rows);
+    if (insErr) throw insErr;
+
+    alleAufstellungen = alleAufstellungen.filter(a => a.spieltermin_id !== terminId);
+    rows.forEach(r => alleAufstellungen.push({ ...r }));
+
+    modal.remove();
+    renderTabelle();
+
+  } catch (err) {
+    alert('Fehler beim Speichern: ' + err.message);
+    console.error(err);
+    btn.disabled = false; btn.textContent = 'Aufstellung speichern';
+  }
 }
 
 // ============================================================
