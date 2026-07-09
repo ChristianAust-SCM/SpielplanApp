@@ -197,8 +197,9 @@ function rueckmeldungAlt(altTermine) {
   // Gibt pro Alternativtermin ein separates Badge zurück
   if (!altTermine || altTermine.length === 0) return '';
   const kader = alleSpieler.length || (aktiveMannschaft?.min_spieler || 6);
+  const aktiveIds = new Set(alleSpieler.map(s => s.id));
   return altTermine.map(function(at, i) {
-    const av      = alleVerfueg.filter(v => v.alternativtermin_id === at.id);
+    const av      = alleVerfueg.filter(v => v.alternativtermin_id === at.id && aktiveIds.has(v.spieler_id));
     const gesamt  = av.length;
     const fehlen  = Math.max(0, kader - gesamt);
     const ad      = new Date(at.datum).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
@@ -256,7 +257,8 @@ function renderTabelle() {
           altTermineInfo.map(function(at, i) {
             const ad  = new Date(at.datum).toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit' });
             const auhr = at.uhrzeit ? at.uhrzeit.slice(0,5) : '';
-            const altVerfueg = alleVerfueg.filter(v => v.alternativtermin_id === at.id);
+            const _aktiveIds = new Set(alleSpieler.map(s => s.id));
+            const altVerfueg = alleVerfueg.filter(v => v.alternativtermin_id === at.id && _aktiveIds.has(v.spieler_id));
             const altJa   = altVerfueg.filter(v => v.antwort === 'Ja').length;
             const altViel = altVerfueg.filter(v => v.antwort === 'Vielleicht').length;
             const altNein = altVerfueg.filter(v => v.antwort === 'Nein').length;
@@ -577,14 +579,16 @@ async function zeigeAdminVerschiebungsModal(termin) {
   const { data: altTermine } = await sb.from('alternativtermine')
     .select('*').eq('spieltermin_id', termin.id).order('datum');
 
-  // Ja-Zahlen je Alternativtermin
+  // Ja-Zahlen je Alternativtermin (nur aktive Kaderspieler)
   if (altTermine && altTermine.length > 0) {
+    const aktiveIds = new Set(alleSpieler.map(s => s.id));
     for (const at of altTermine) {
       const { data: vd } = await sb.from('verfuegbarkeiten')
-        .select('antwort').eq('alternativtermin_id', at.id);
-      at._ja = (vd||[]).filter(v => v.antwort === 'Ja').length;
-      at._vielleicht = (vd||[]).filter(v => v.antwort === 'Vielleicht').length;
-      at._nein = (vd||[]).filter(v => v.antwort === 'Nein').length;
+        .select('antwort, spieler_id').eq('alternativtermin_id', at.id);
+      const gefiltert = (vd||[]).filter(v => aktiveIds.has(v.spieler_id));
+      at._ja = gefiltert.filter(v => v.antwort === 'Ja').length;
+      at._vielleicht = gefiltert.filter(v => v.antwort === 'Vielleicht').length;
+      at._nein = gefiltert.filter(v => v.antwort === 'Nein').length;
     }
   }
 
