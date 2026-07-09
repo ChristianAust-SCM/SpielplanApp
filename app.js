@@ -901,20 +901,28 @@ function zeigeFehlende(terminId, altTerminId) {
 // ============================================================
 function kopierenWA(btn, text) {
   const decoded = text.replace(/\\n/g, '\n');
-  navigator.clipboard.writeText(decoded).then(function() {
-    btn.classList.add('kopiert');
-    setTimeout(function() { btn.classList.remove('kopiert'); }, 2500);
-  }).catch(function() {
-    const ta = document.createElement('textarea');
-    ta.value = decoded;
-    ta.style.cssText = 'position:fixed;opacity:0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.classList.add('kopiert');
-    setTimeout(function() { btn.classList.remove('kopiert'); }, 2500);
-  });
+
+  // 1. Text zusätzlich in Zwischenablage kopieren (Absicherung)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(decoded).catch(function() {
+      const ta = document.createElement('textarea');
+      ta.value = decoded;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+    });
+  }
+
+  // 2. Kurzes visuelles Feedback am Button
+  btn.classList.add('kopiert');
+  setTimeout(function() { btn.classList.remove('kopiert'); }, 2500);
+
+  // 3. WhatsApp mit vorausgefülltem Text öffnen
+  //    (Gruppe wählt der MF selbst – WhatsApp lässt keine Gruppen-Vorauswahl per Link zu)
+  const waUrl = 'https://wa.me/?text=' + encodeURIComponent(decoded);
+  window.open(waUrl, '_blank');
 }
 
 // ============================================================
