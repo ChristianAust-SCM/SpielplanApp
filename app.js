@@ -154,16 +154,30 @@ function renderStats() {
     (document.querySelector('[for-stat="ok"]').textContent = `Spielbereit (≥${min} Ja)`);
 }
 
+function kaderIds() {
+  // IDs der aktiven Spieler der aktuell geladenen Mannschaft.
+  // Votes von deaktivierten oder in andere Mannschaften verschobenen
+  // Spielern bleiben in der DB, dürfen aber nicht mitgezählt werden.
+  return new Set(alleSpieler.map(function(s) { return s.id; }));
+}
+
 function zaehleAntworten(terminId, antwort) {
+  const ids = kaderIds();
   return alleVerfueg.filter(v =>
     v.spieltermin_id === terminId &&
     v.antwort === antwort &&
+    ids.has(v.spieler_id) &&
     (v.alternativtermin_id === null || v.alternativtermin_id === undefined)
   ).length;
 }
 
 function ampelKlasse(terminId) {
-  const hatAbfrage = alleVerfueg.some(v => v.spieltermin_id === terminId);
+  const ids = kaderIds();
+  const hatAbfrage = alleVerfueg.some(v =>
+    v.spieltermin_id === terminId &&
+    ids.has(v.spieler_id) &&
+    v.alternativtermin_id === null
+  );
   if (!hatAbfrage) return 'offen';
   const ja  = zaehleAntworten(terminId, 'Ja');
   const min = aktiveMannschaft?.min_spieler || 6;
@@ -173,7 +187,12 @@ function ampelKlasse(terminId) {
 }
 
 function ampelText(terminId) {
-  const hat = alleVerfueg.some(v => v.spieltermin_id === terminId && v.alternativtermin_id === null);
+  const ids = kaderIds();
+  const hat = alleVerfueg.some(v =>
+    v.spieltermin_id === terminId &&
+    ids.has(v.spieler_id) &&
+    v.alternativtermin_id === null
+  );
   if (!hat) return null;
   const ja         = zaehleAntworten(terminId, 'Ja');
   const nein       = zaehleAntworten(terminId, 'Nein');
@@ -182,7 +201,12 @@ function ampelText(terminId) {
 }
 
 function rueckmeldungText(terminId) {
-  const hat = alleVerfueg.some(v => v.spieltermin_id === terminId && v.alternativtermin_id === null);
+  const ids = kaderIds();
+  const hat = alleVerfueg.some(v =>
+    v.spieltermin_id === terminId &&
+    ids.has(v.spieler_id) &&
+    v.alternativtermin_id === null
+  );
   if (!hat) return null;
   const ja         = zaehleAntworten(terminId, 'Ja');
   const nein       = zaehleAntworten(terminId, 'Nein');
