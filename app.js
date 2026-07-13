@@ -307,7 +307,10 @@ function renderTabelle() {
       : '';
 
     // Ist dieser Termin im Alternativtermin-Modus?
-    const istAlternativ = t.status === 'Verschoben' || t.status === 'Verschiebung nötig';
+    // Nur 'Verschiebung nötig' gilt als offen. Bestätigte Termine
+    // (Status 'Verschoben') sind vollwertige Termine mit allen Buttons,
+    // erkennbar am Badge '· ALTERNATIVTERMIN'.
+    const istAlternativ = t.status === 'Verschiebung nötig';
     const altTermine    = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
     const rowStyle      = istAlternativ ? 'opacity:0.45;' : '';
 
@@ -634,7 +637,7 @@ async function zeigeAdminVerschiebungsModal(termin) {
             '<span style="background:rgba(240,180,41,0.12);color:#F0C060;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._vielleicht + ' Vielleicht</span>' +
             '<span style="background:rgba(226,75,74,0.12);color:#F08080;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._nein + ' Nein</span>' +
           '</div>' +
-          '<button onclick="bestaetigeAlternativtermin(\'' + termin.id + '\',\'' + at.datum + '\',\'' + (at.uhrzeit||'') + '\')" ' +
+          '<button onclick="bestaetigeAlternativtermin(\'' + termin.id + '\',\'' + at.id + '\',\'' + at.datum + '\',\'' + (at.uhrzeit||'') + '\')" ' +
             'style="width:100%;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">' +
             '✓ Diesen Termin als neuen Spieltermin bestätigen' +
           '</button>' +
@@ -669,9 +672,9 @@ async function zeigeAdminVerschiebungsModal(termin) {
   document.body.appendChild(modal);
 }
 
-async function bestaetigeAlternativtermin(terminId, datum, uhrzeit) {
-  if (!confirm('Diesen Alternativtermin als neuen Spieltermin bestätigen?\nAlle Alternativtermine und alten Abstimmungen werden gelöscht.')) return;
-  await _verschiebungFertigstellen(terminId, datum, uhrzeit);
+async function bestaetigeAlternativtermin(terminId, altId, datum, uhrzeit) {
+  if (!confirm('Diesen Alternativtermin als neuen Spieltermin bestätigen?\nDie Abstimmung zu diesem Termin wird übernommen, die übrigen Alternativtermine werden gelöscht.')) return;
+  await _verschiebungFertigstellen(terminId, datum, uhrzeit, altId);
 }
 
 async function bestaetigeEigenerTermin(terminId) {
@@ -679,23 +682,36 @@ async function bestaetigeEigenerTermin(terminId) {
   const uhrzeit = document.getElementById('admin-uhrzeit').value;
   if (!datum) { alert('Bitte ein Datum eingeben.'); return; }
   if (!confirm('Neuen Termin bestätigen?\nAlle Alternativtermine und alten Abstimmungen werden gelöscht.')) return;
-  await _verschiebungFertigstellen(terminId, datum, uhrzeit);
+  await _verschiebungFertigstellen(terminId, datum, uhrzeit, null);
 }
 
-async function _verschiebungFertigstellen(terminId, datum, uhrzeit) {
-  const neuerToken = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-
-  // 1. Spieltermin aktualisieren
-  const { error: te } = await sb.from('spieltermine').update({
-    datum: datum, uhrzeit: uhrzeit || null,
-    status: 'Verschoben', abfrage_token: neuerToken
-  }).eq('id', terminId);
+async function _verschiebungFertigstellen(terminId, datum, uhrzeit, uebernahmeAltId) {
+  // 1. Spieltermin aktualisieren.
+  //    Mit Stimmen-Übernahme bleibt der Abfrage-Token erhalten, damit der
+  //    bereits verschickte Link für die noch fehlenden Spieler weiter funktioniert.
+  //    Ohne Übernahme (eigener Termin) ist eine Neuabstimmung nötig -> neuer Token.
+  const update = { datum: datum, uhrzeit: uhrzeit || null, status: 'Verschoben' };
+  if (!uebernahmeAltId) {
+    update.abfrage_token = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+  }
+  const { error: te } = await sb.from('spieltermine').update(update).eq('id', terminId);
   if (te) { alert('Fehler: ' + te.message); return; }
 
-  // 2. Alte Abstimmungen löschen
-  await sb.from('verfuegbarkeiten').delete().eq('spieltermin_id', terminId);
+  // 2. Alte Abstimmungen zum ursprünglichen Termin löschen (nur normale Votes,
+  //    Alternativtermin-Votes werden in Schritt 3/4 behandelt)
+  await sb.from('verfuegbarkeiten').delete()
+    .eq('spieltermin_id', terminId)
+    .is('alternativtermin_id', null);
 
-  // 3. Alle Alternativtermine löschen
+  // 3. Stimmen des bestätigten Alternativtermins als normale Votes übernehmen
+  if (uebernahmeAltId) {
+    const { error: ue } = await sb.from('verfuegbarkeiten')
+      .update({ alternativtermin_id: null })
+      .eq('alternativtermin_id', uebernahmeAltId);
+    if (ue) { alert('Fehler bei der Stimmen-Übernahme: ' + ue.message); return; }
+  }
+
+  // 4. Übrige Alternativtermin-Stimmen löschen, dann alle Alternativtermine
   const { data: alts } = await sb.from('alternativtermine').select('id').eq('spieltermin_id', terminId);
   if (alts && alts.length > 0) {
     for (const alt of alts) {
@@ -706,7 +722,9 @@ async function _verschiebungFertigstellen(terminId, datum, uhrzeit) {
 
   document.querySelector('[style*="fixed"]')?.remove();
   await ladeMannschaft(aktiveMannschaft.id);
-  alert('✓ Termin bestätigt. Der MF kann jetzt den neuen WhatsApp-Link schicken.');
+  alert(uebernahmeAltId
+    ? '✓ Termin bestätigt. Die Abstimmung wurde übernommen – der bestehende Link gilt weiter für die noch fehlenden Spieler.'
+    : '✓ Termin bestätigt. Der MF kann jetzt den neuen WhatsApp-Link schicken.');
 }
 
 // ============================================================
