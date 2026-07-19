@@ -375,7 +375,7 @@ function renderTabelle() {
               '</div>' +
             '</button>'
           : '<span style="font-size:12px;color:var(--muted)">–</span>') + '</td>' +
-      '<td style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap">' + aktionButtons + '</td>' +
+      '<td style="vertical-align:middle"><div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap">' + aktionButtons + '</div></td>' +
     '</tr>';
   }).join('');
 
