@@ -736,6 +736,24 @@ function zeigeAufstellung(terminId) {
 
   const min = aktiveMannschaft?.min_spieler || 6;
 
+  // Ersatz aus der 3. Mannschaft: aktuell nur für die 2. Mannschaft möglich,
+  // kein konkreter Spielername, nur ein Platzhalter-Slot.
+  const dritteMannschaft = alleMannschaften.find(m => m.name === '3. Mannschaft');
+  const zeigeErsatzOption = aktiveMannschaft?.name === '2. Mannschaft' && !!dritteMannschaft;
+  const vorhandeneErsatzAnzahl = alleAufstellungen.filter(
+    a => a.spieltermin_id === terminId && a.ersatz_mannschaft_id != null
+  ).length;
+
+  function ersatzRowHtml() {
+    return '<div class="auf-ersatz-row" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(212,98,10,0.12);border:1px solid rgba(212,98,10,0.3);border-radius:8px;margin-bottom:6px">' +
+      '<input type="checkbox" class="auf-check auf-check-ersatz" checked disabled style="width:18px;height:18px;accent-color:#D4620A;flex-shrink:0">' +
+      '<span style="flex:1;font-size:14px;color:#F07830;font-weight:700">Ersatz · 3. Mannschaft</span>' +
+      '<button type="button" class="auf-ersatz-entfernen" title="Entfernen" style="background:none;border:none;color:#8996B4;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px">✕</button>' +
+    '</div>';
+  }
+
+  const ersatzListeHtml = Array(vorhandeneErsatzAnzahl).fill(0).map(ersatzRowHtml).join('');
+
   function vorname(n) { const p = n.split(','); return p.length===2 ? p[1].trim()+' '+p[0].trim() : n; }
   function posLabel(sp) { return sp.position != null ? sp.position + '.' : '–'; }
 
@@ -791,6 +809,10 @@ function zeigeAufstellung(terminId) {
           '<div id="auf-counter" style="font-size:12px;font-weight:700;color:#8996B4">0 / ' + min + '</div>' +
         '</div>' +
         listeHtml +
+        '<div id="auf-ersatz-liste">' + ersatzListeHtml + '</div>' +
+        (zeigeErsatzOption
+          ? '<button type="button" id="auf-ersatz-add" style="margin-top:2px;padding:8px 14px;border-radius:8px;border:1px dashed rgba(212,98,10,0.5);background:rgba(212,98,10,0.06);color:#F07830;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">+ Ersatz 3. Mannschaft hinzufügen</button>'
+          : '') +
       '</div>' +
       '<div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:#152232">' +
         '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="padding:9px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#8996B4;font-size:13px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">Abbrechen</button>' +
@@ -819,18 +841,45 @@ function zeigeAufstellung(terminId) {
     updateCounter();
   }));
 
+  // Ersatz-3.-Mannschaft-Zeilen: hinzufügen/entfernen
+  const ersatzListe = modal.querySelector('#auf-ersatz-liste');
+  const ersatzAddBtn = modal.querySelector('#auf-ersatz-add');
+
+  function wireErsatzEntfernen(row) {
+    row.querySelector('.auf-ersatz-entfernen').addEventListener('click', () => {
+      row.remove();
+      updateCounter();
+    });
+  }
+  ersatzListe.querySelectorAll('.auf-ersatz-row').forEach(wireErsatzEntfernen);
+
+  if (ersatzAddBtn) {
+    ersatzAddBtn.addEventListener('click', () => {
+      ersatzListe.insertAdjacentHTML('beforeend', ersatzRowHtml());
+      wireErsatzEntfernen(ersatzListe.lastElementChild);
+      updateCounter();
+    });
+  }
+
   updateCounter();
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
 async function speichereAufstellung(terminId, btn) {
   const modal = btn.closest('[style*=fixed]');
-  const gewaehlt = Array.from(modal.querySelectorAll('.auf-check'))
+  const gewaehlt = Array.from(modal.querySelectorAll('.auf-check:not(.auf-check-ersatz)'))
     .filter(c => c.checked).map(c => c.value);
+  const ersatzAnzahl = modal.querySelectorAll('.auf-ersatz-row').length;
 
   const min = aktiveMannschaft?.min_spieler || 6;
-  if (gewaehlt.length !== min) {
-    alert('Bitte genau ' + min + ' Spieler auswählen.');
+  if (gewaehlt.length + ersatzAnzahl !== min) {
+    alert('Bitte genau ' + min + ' Spieler/Ersatz auswählen.');
+    return;
+  }
+
+  const dritteMannschaft = alleMannschaften.find(m => m.name === '3. Mannschaft');
+  if (ersatzAnzahl > 0 && !dritteMannschaft) {
+    alert('3. Mannschaft nicht gefunden – Ersatz kann nicht gespeichert werden.');
     return;
   }
 
@@ -841,7 +890,11 @@ async function speichereAufstellung(terminId, btn) {
       .delete().eq('spieltermin_id', terminId);
     if (delErr) throw delErr;
 
-    const rows = gewaehlt.map(sid => ({ spieltermin_id: terminId, spieler_id: sid }));
+    const spielerRows = gewaehlt.map(sid => ({ spieltermin_id: terminId, spieler_id: sid }));
+    const ersatzRows  = Array(ersatzAnzahl).fill(0).map(() =>
+      ({ spieltermin_id: terminId, spieler_id: null, ersatz_mannschaft_id: dritteMannschaft.id })
+    );
+    const rows = spielerRows.concat(ersatzRows);
     const { error: insErr } = await sb.from('aufstellungen').insert(rows);
     if (insErr) throw insErr;
 
