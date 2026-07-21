@@ -15,6 +15,7 @@ let alleSpieler      = [];
 let alleAlternativtermine = [];
 let alleAufstellungen = [];
 let istAdmin         = false;
+let alleHelfer       = [];
 
 async function init() {
   // Auth prüfen
@@ -76,11 +77,20 @@ async function abmelden() {
 // ============================================================
 function renderTabs() {
   const el = document.getElementById('tabs');
-  el.innerHTML = alleMannschaften.map(m =>
+  let html = alleMannschaften.map(m =>
     '<button class="tab" onclick="ladeMannschaft(\'' + m.id + '\')" data-id="' + m.id + '">' +
       m.name + ' <span style="font-size:11px;opacity:.7">· ' + m.liga + '</span>' +
     '</button>'
   ).join('');
+
+  // Turnier-Helfer-Tab nur für Admins (Pink, optisch abgesetzt von den Mannschaften)
+  if (istAdmin) {
+    html += '<button class="tab tab-turnier" onclick="ladeTurnierHelfer()" data-id="turnier-helfer">' +
+      'Turnier-Helfer' +
+    '</button>';
+  }
+
+  el.innerHTML = html;
 }
 
 function setAktivTab(id) {
@@ -95,6 +105,10 @@ function setAktivTab(id) {
 async function ladeMannschaft(mannschaftId) {
   aktiveMannschaft = alleMannschaften.find(m => m.id === mannschaftId);
   setAktivTab(mannschaftId);
+
+  // Stats-Leiste wieder einblenden (falls von Turnier-Helfer-Ansicht kommend)
+  const statsEl = document.getElementById('stats');
+  if (statsEl) statsEl.style.display = 'grid';
 
   document.getElementById('table-container').innerHTML =
     '<div class="loading"><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span></div>';
@@ -1018,6 +1032,89 @@ function kopierenWA(btn, text) {
   //    (Gruppe wählt der MF selbst – WhatsApp lässt keine Gruppen-Vorauswahl per Link zu)
   const waUrl = 'https://wa.me/?text=' + encodeURIComponent(decoded);
   window.open(waUrl, '_blank');
+}
+
+// ============================================================
+// Turnier-Helfer (nur Admin)
+// ============================================================
+async function ladeTurnierHelfer() {
+  aktiveMannschaft = null;
+  setAktivTab('turnier-helfer');
+
+  // Stats-Leiste ausblenden (Helfer-Ansicht bringt eigene Kennzahlen)
+  const statsEl = document.getElementById('stats');
+  if (statsEl) statsEl.style.display = 'none';
+  const secTitle = document.getElementById('section-title');
+  if (secTitle) secTitle.textContent = 'Turnier-Helfer · Mitternachtsturnier 05.09.2026';
+
+  document.getElementById('table-container').innerHTML =
+    '<div class="loading"><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span></div>';
+
+  const res = await sb.from('turnier_helfer').select('*').order('created_at');
+  if (res.error) {
+    document.getElementById('table-container').innerHTML =
+      '<div class="config-hint"><strong style="color:#E24B4A">Fehler:</strong> ' + res.error.message + '</div>';
+    return;
+  }
+  alleHelfer = res.data || [];
+  renderHelferAnsicht();
+}
+
+function renderHelferAnsicht() {
+  const helferBaseUrl = 'https://spielplanapp.christianaust.eu/helfer.html';
+
+  const gesamt  = alleHelfer.length;
+  const aufbau  = alleHelfer.filter(h => h.einsatz === 'aufbau').length;
+  const turnier = alleHelfer.filter(h => h.einsatz === 'turnier').length;
+  const beides  = alleHelfer.filter(h => h.einsatz === 'beides').length;
+
+  const einsatzBadge = (e) => {
+    if (e === 'aufbau')  return '<span style="background:rgba(240,180,41,0.15);color:#F0C060;padding:2px 9px;border-radius:10px;font-size:12px;font-weight:700">Auf-/Abbau</span>';
+    if (e === 'turnier') return '<span style="background:rgba(29,158,117,0.15);color:#4FD4A8;padding:2px 9px;border-radius:10px;font-size:12px;font-weight:700">Turnier</span>';
+    return '<span style="background:rgba(212,83,126,0.18);color:#E88FB0;padding:2px 9px;border-radius:10px;font-size:12px;font-weight:700">Beides</span>';
+  };
+
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  const waHelferText = 'Hallo zusammen,\\nwir suchen Helfer fuer unser Mitternachtsturnier am 05.09.2026 (Tisch 7).\\n\\nTrag dich hier ein, wobei du helfen kannst:\\n👉 ' + helferBaseUrl + '\\n\\nDanke euch!';
+
+  const kennzahlen =
+    '<div class="stats" style="display:grid">' +
+      '<div class="stat-card"><div class="stat-label">Helfer gesamt</div><div class="stat-value">' + gesamt + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Auf-/Abbau</div><div class="stat-value warn">' + aufbau + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Turnier</div><div class="stat-value ok">' + turnier + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Beides</div><div class="stat-value" style="color:#E88FB0">' + beides + '</div></div>' +
+    '</div>';
+
+  const aktionsLeiste =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">' +
+      '<a href="' + helferBaseUrl + '" target="_blank" class="btn-abfrage" style="text-decoration:none">Eintrage-Seite öffnen</a>' +
+      '<button class="btn-wa" onclick="kopierenWA(this, \'' + waHelferText + '\')">💬 Einladung per WhatsApp</button>' +
+    '</div>';
+
+  let tabelle;
+  if (gesamt === 0) {
+    tabelle = '<div class="loading" style="padding:40px">Noch keine Helfer eingetragen. Verschick die Einladung, damit sich Helfer eintragen können.</div>';
+  } else {
+    const rows = alleHelfer.map(function(h) {
+      const dt = new Date(h.created_at).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }) +
+                 ' ' + new Date(h.created_at).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      return '<tr>' +
+        '<td style="font-weight:700">' + escapeHtml(h.name) + '</td>' +
+        '<td>' + einsatzBadge(h.einsatz) + '</td>' +
+        '<td style="color:#8996B4;font-size:13px">' + dt + '</td>' +
+      '</tr>';
+    }).join('');
+
+    tabelle =
+      '<table class="spielplan-table">' +
+        '<thead><tr><th>Name</th><th>Einsatz</th><th>Eingetragen</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>';
+  }
+
+  document.getElementById('table-container').innerHTML = kennzahlen + aktionsLeiste + tabelle;
 }
 
 // ============================================================

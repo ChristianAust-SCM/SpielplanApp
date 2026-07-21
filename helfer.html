@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Helfer – Mitternachtsturnier · FC Strass</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:#1e3550; --navy2:#2a445f; --navy3:#375373;
+      --orange:#D4620A; --orange2:#F07830;
+      --teal:#1D9E75; --pink:#D4537E; --purple:#534AB7;
+      --white:#F7F9FF; --muted:#8996B4; --line:rgba(255,255,255,0.14); --radius:10px;
+    }
+    body {
+      font-family: Calibri, 'Segoe UI', system-ui, sans-serif;
+      background: var(--navy); color: var(--white);
+      min-height: 100vh; font-size: 15px; line-height: 1.55;
+      display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px;
+    }
+    .card {
+      background: var(--navy2); border: 1px solid var(--line); border-radius: 16px;
+      max-width: 440px; width: 100%; padding: 26px 24px;
+    }
+    .head { text-align: center; margin-bottom: 22px; }
+    .head h1 {
+      font-family: 'Bahnschrift SemiBold', 'Segoe UI Semibold', sans-serif;
+      font-size: 20px; color: var(--orange2); letter-spacing: 0.02em;
+    }
+    .head .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    label.lbl { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input[type=text] {
+      width: 100%; background: var(--navy); border: 1px solid var(--line);
+      border-radius: 8px; padding: 12px; color: var(--white); font-size: 15px;
+      font-family: inherit; margin-bottom: 18px;
+    }
+    input[type=text]:focus { outline: none; border-color: var(--orange); }
+    .opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+    .opt {
+      background: var(--navy); border: 1px solid var(--line); border-radius: 8px;
+      padding: 13px 14px; display: flex; align-items: center; gap: 11px; cursor: pointer;
+      transition: border-color 140ms, background 140ms;
+    }
+    .opt:hover { border-color: var(--orange); }
+    .opt.sel { border: 2px solid var(--orange); background: rgba(212,98,10,0.08); }
+    .opt .radio {
+      width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--muted);
+      flex-shrink: 0; transition: all 140ms;
+    }
+    .opt.sel .radio { border: 5px solid var(--orange); background: #fff; }
+    .opt-title { font-weight: 700; font-size: 14px; }
+    .opt-sub { font-size: 12px; color: var(--muted); }
+    .btn {
+      width: 100%; background: var(--orange); color: #fff; border: none; border-radius: 8px;
+      padding: 14px; font-weight: 700; font-size: 15px; font-family: inherit; cursor: pointer;
+      transition: background 140ms, opacity 140ms;
+    }
+    .btn:hover { background: var(--orange2); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .msg { text-align: center; padding: 30px 10px; }
+    .msg .ico { font-size: 40px; margin-bottom: 12px; }
+    .msg h2 { font-family: 'Bahnschrift SemiBold', sans-serif; font-size: 19px; color: var(--teal); margin-bottom: 6px; }
+    .msg p { font-size: 14px; color: var(--muted); }
+    .hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
+    .err { background: rgba(226,75,74,0.12); border: 1px solid rgba(226,75,74,0.3);
+      border-radius: 8px; padding: 12px; font-size: 13px; color: #F08080; margin-bottom: 16px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="head">
+      <h1>Helfer gesucht – Mitternachtsturnier</h1>
+      <div class="sub">05.09.2026 · Tisch 7 · FC Strass</div>
+    </div>
+
+    <div class="err" id="err"></div>
+
+    <div id="form-wrap">
+      <label class="lbl" for="name">Dein Name</label>
+      <input type="text" id="name" placeholder="z.B. Max Mustermann" autocomplete="name">
+
+      <label class="lbl">Wobei kannst du helfen?</label>
+      <div class="opts" id="opts">
+        <div class="opt" data-val="aufbau" onclick="waehle(this)">
+          <span class="radio"></span>
+          <span><span class="opt-title">Auf- und Abbau</span><br><span class="opt-sub">Tische, Technik, Deko, Aufräumen</span></span>
+        </div>
+        <div class="opt" data-val="turnier" onclick="waehle(this)">
+          <span class="radio"></span>
+          <span><span class="opt-title">Turnier selbst</span><br><span class="opt-sub">Theke, Küche, Kasse während des Abends</span></span>
+        </div>
+        <div class="opt" data-val="beides" onclick="waehle(this)">
+          <span class="radio"></span>
+          <span><span class="opt-title">Beides</span><br><span class="opt-sub">Auf-/Abbau und Turnier</span></span>
+        </div>
+      </div>
+
+      <button class="btn" id="btn" onclick="senden()" disabled>Eintragen</button>
+      <div class="hint">Deine Angabe hilft uns bei der Planung. Danke fürs Mitmachen!</div>
+    </div>
+  </div>
+
+<script>
+var SUPABASE_URL  = 'https://nwutgxjnverlvmkrpiep.supabase.co';
+var SUPABASE_ANON = 'sb_publishable_09tn0DY3wswcIVQ-mN1S8A_znKWQXaF';
+var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+var gewaehlt = null;
+
+function waehle(el) {
+  document.querySelectorAll('.opt').forEach(function(o){ o.classList.remove('sel'); });
+  el.classList.add('sel');
+  gewaehlt = el.dataset.val;
+  pruefe();
+}
+
+function pruefe() {
+  var name = document.getElementById('name').value.trim();
+  document.getElementById('btn').disabled = !(name.length >= 2 && gewaehlt);
+}
+
+document.getElementById('name').addEventListener('input', pruefe);
+
+function zeigeFehler(text) {
+  var e = document.getElementById('err');
+  e.textContent = text; e.style.display = 'block';
+}
+
+async function senden() {
+  var name = document.getElementById('name').value.trim();
+  if (name.length < 2 || !gewaehlt) return;
+
+  var btn = document.getElementById('btn');
+  btn.disabled = true; btn.textContent = 'Wird gesendet...';
+  document.getElementById('err').style.display = 'none';
+
+  try {
+    var res = await sb.from('turnier_helfer').insert({ name: name, einsatz: gewaehlt });
+    if (res.error) throw res.error;
+
+    var einsatzText = gewaehlt === 'aufbau' ? 'Auf- und Abbau'
+      : gewaehlt === 'turnier' ? 'Turnier selbst' : 'Auf-/Abbau und Turnier';
+    document.getElementById('card').innerHTML =
+      '<div class="msg">' +
+        '<div class="ico">✓</div>' +
+        '<h2>Danke, ' + name.replace(/</g,'&lt;') + '!</h2>' +
+        '<p>Du bist eingetragen für: <strong style="color:#F7F9FF">' + einsatzText + '</strong></p>' +
+        '<p style="margin-top:10px">Wir melden uns mit den Details.</p>' +
+      '</div>';
+  } catch (err) {
+    zeigeFehler('Eintragen fehlgeschlagen: ' + err.message);
+    btn.disabled = false; btn.textContent = 'Eintragen';
+  }
+}
+</script>
+</body>
+</html>
