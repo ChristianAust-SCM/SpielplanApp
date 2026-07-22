@@ -1098,16 +1098,20 @@ function renderHelferAnsicht() {
     const rows = alleHelfer.map(function(h) {
       const dt = new Date(h.created_at).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }) +
                  ' ' + new Date(h.created_at).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+      const anm = h.anmerkung && h.anmerkung.trim()
+        ? '<span style="color:#CBD8E6">' + escapeHtml(h.anmerkung) + '</span>'
+        : '<span style="color:#8996B4">–</span>';
       return '<tr>' +
         '<td style="font-weight:700">' + escapeHtml(h.name) + '</td>' +
         '<td>' + einsatzBadge(h.einsatz) + '</td>' +
+        '<td style="font-size:13px">' + anm + '</td>' +
         '<td style="color:#8996B4;font-size:13px">' + dt + '</td>' +
       '</tr>';
     }).join('');
 
     tabelle =
       '<table class="spielplan-table">' +
-        '<thead><tr><th>Name</th><th>Einsatz</th><th>Eingetragen</th></tr></thead>' +
+        '<thead><tr><th>Name</th><th>Einsatz</th><th>Sonstiges / Anmerkung</th><th>Eingetragen</th></tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
       '</table>';
   }

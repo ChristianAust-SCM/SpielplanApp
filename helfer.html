@@ -36,6 +36,13 @@
       font-family: inherit; margin-bottom: 18px;
     }
     input[type=text]:focus { outline: none; border-color: var(--orange); }
+    textarea {
+      width: 100%; background: var(--navy); border: 1px solid var(--line);
+      border-radius: 8px; padding: 12px; color: var(--white); font-size: 15px;
+      font-family: inherit; margin-bottom: 18px; resize: vertical; min-height: 64px;
+    }
+    textarea:focus { outline: none; border-color: var(--orange); }
+    textarea::placeholder { color: var(--muted); font-style: italic; }
     .opts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
     .opt {
       background: var(--navy); border: 1px solid var(--line); border-radius: 8px;
@@ -96,6 +103,9 @@
         </div>
       </div>
 
+      <label class="lbl" for="anmerkung">Sonstiges / Anmerkung <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+      <textarea id="anmerkung" placeholder="z.B. bringe Musikanlage mit, kann erst ab 22 Uhr…"></textarea>
+
       <button class="btn" id="btn" onclick="senden()" disabled>Eintragen</button>
       <div class="hint">Deine Angabe hilft uns bei der Planung. Danke fürs Mitmachen!</div>
     </div>
@@ -131,12 +141,14 @@ async function senden() {
   var name = document.getElementById('name').value.trim();
   if (name.length < 2 || !gewaehlt) return;
 
+  var anmerkung = document.getElementById('anmerkung').value.trim();
+
   var btn = document.getElementById('btn');
   btn.disabled = true; btn.textContent = 'Wird gesendet...';
   document.getElementById('err').style.display = 'none';
 
   try {
-    var res = await sb.from('turnier_helfer').insert({ name: name, einsatz: gewaehlt });
+    var res = await sb.from('turnier_helfer').insert({ name: name, einsatz: gewaehlt, anmerkung: anmerkung || null });
     if (res.error) throw res.error;
 
     var einsatzText = gewaehlt === 'aufbau' ? 'Auf- und Abbau'
