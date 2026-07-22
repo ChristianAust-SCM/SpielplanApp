@@ -1077,8 +1077,6 @@ function renderHelferAnsicht() {
   const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c =>
     ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-  const waHelferText = 'Hallo zusammen,\\nwir suchen Helfer fuer unser Mitternachtsturnier am 05.09.2026 (Tisch 7).\\n\\nTrag dich hier ein, wobei du helfen kannst:\\n👉 ' + helferBaseUrl + '\\n\\nDanke euch!';
-
   const kennzahlen =
     '<div class="stats" style="display:grid">' +
       '<div class="stat-card"><div class="stat-label">Helfer gesamt</div><div class="stat-value">' + gesamt + '</div></div>' +
@@ -1090,7 +1088,7 @@ function renderHelferAnsicht() {
   const aktionsLeiste =
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">' +
       '<a href="' + helferBaseUrl + '" target="_blank" class="btn-abfrage" style="text-decoration:none">Eintrage-Seite öffnen</a>' +
-      '<button class="btn-wa" onclick="kopierenWA(this, \'' + waHelferText + '\')">💬 Einladung per WhatsApp</button>' +
+      '<button class="btn-wa" onclick="zeigeHelferEinladung()">💬 Einladung erstellen</button>' +
     '</div>';
 
   let tabelle;
@@ -1115,6 +1113,67 @@ function renderHelferAnsicht() {
   }
 
   document.getElementById('table-container').innerHTML = kennzahlen + aktionsLeiste + tabelle;
+}
+
+// ============================================================
+// Helfer-Einladung: editierbarer Text zum Kopieren (kein WhatsApp-Öffnen)
+// ============================================================
+function zeigeHelferEinladung() {
+  const helferBaseUrl = 'https://spielplanapp.christianaust.eu/helfer.html';
+  const vorgabe =
+    'Hallo zusammen,\n' +
+    'wir suchen Helfer für unser Mitternachtsturnier am 05.09.2026 (Tisch 7).\n\n' +
+    'Trag dich hier ein, wobei du helfen kannst:\n' +
+    '👉 ' + helferBaseUrl + '\n\n' +
+    'Danke euch!';
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px';
+  modal.innerHTML =
+    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:460px;width:100%">' +
+      '<div style="padding:18px 22px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">' +
+        '<div>' +
+          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:16px;color:#F07830">Helfer-Einladung</div>' +
+          '<div style="font-size:13px;color:#8996B4;margin-top:2px">Text anpassen, kopieren, in die WhatsApp-Gruppe einfügen</div>' +
+        '</div>' +
+        '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
+      '</div>' +
+      '<div style="padding:20px 22px">' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Nachricht</div>' +
+        '<textarea id="helfer-einladung-text" style="width:100%;min-height:170px;background:#0D1B2A;border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:12px 14px;font-size:14px;line-height:1.6;color:#F7F9FF;font-family:Calibri,sans-serif;resize:vertical;outline:none"></textarea>' +
+        '<div style="font-size:12px;color:#8996B4;margin-top:6px">Der Text ist frei editierbar – anpassen, dann kopieren.</div>' +
+        '<div style="display:flex;gap:8px;margin-top:16px">' +
+          '<button id="helfer-copy-btn" onclick="kopiereHelferText(this)" style="flex:1;background:#25D366;border:none;border-radius:8px;padding:12px;text-align:center;font-size:14px;font-weight:700;color:#fff;cursor:pointer;font-family:Calibri,sans-serif">📋 Text kopieren</button>' +
+          '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:#2a445f;border:none;border-radius:8px;padding:12px 16px;text-align:center;font-size:14px;color:#CBD8E6;cursor:pointer;font-family:Calibri,sans-serif">Schließen</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+  // Vorgabetext setzen (als value, damit echte Zeilenumbrüche sauber ankommen)
+  document.getElementById('helfer-einladung-text').value = vorgabe;
+}
+
+function kopiereHelferText(btn) {
+  const ta = document.getElementById('helfer-einladung-text');
+  if (!ta) return;
+  const text = ta.value;
+
+  function feedback() {
+    const alt = btn.textContent;
+    btn.textContent = 'Kopiert ✓';
+    btn.style.background = '#128C45';
+    setTimeout(function() { btn.textContent = alt; btn.style.background = '#25D366'; }, 2000);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(feedback).catch(function() {
+      ta.select(); try { document.execCommand('copy'); } catch (e) {} feedback();
+    });
+  } else {
+    ta.select(); try { document.execCommand('copy'); } catch (e) {} feedback();
+  }
 }
 
 // ============================================================
