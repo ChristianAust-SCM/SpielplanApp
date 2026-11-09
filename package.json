@@ -1,0 +1,14 @@
+{
+  "name": "spielplan-app",
+  "version": "2.0.0-dev",
+  "private": true,
+  "description": "Spielplan-App FC Strass – statisches Frontend mit Supabase",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:db": "bash scripts/db-test.sh",
+    "test:alle": "npm test && npm run test:db"
+  },
+  "devDependencies": {
+    "jsdom": "25.0.1"
+  }
+}
