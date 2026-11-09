@@ -1,5 +1,21 @@
 # Spielplan-App 2.0 – Bestandsanalyse und Entwicklungsplan
 
+> **Statusupdate 09./10.11.2026 (Nachtarbeit)**: Inzwischen liegt ein
+> Strukturaudit der Produktiv-DB vor (`docs/SICHERHEITSMODELL.md`, Abschnitt 1).
+> Damit sind mehrere Aussagen unten präzisiert:
+> * D1 (Dubletten) ist **kein** Problem – produktiv gilt bereits
+>   `UNIQUE NULLS NOT DISTINCT (spieltermin_id, alternativtermin_id, spieler_id)`.
+> * S2/S4 sind bestätigt und um die Selbstvergabe von Adminrechten (A1) ergänzt.
+>
+> | Phase | Stand |
+> |---|---|
+> | 0 Fundament | ✅ Baseline rekonstruiert, Tests (JS + pgTAP), zentrale Konfiguration. Offen: Abgleich echter Spaltenliste (Vorabprüfung), Supabase-Stack-Test (T1) |
+> | 1 Sicherheit | ✅ Migrationen 01–03, 09 + Frontend (XSS, RPCs, SRI, Referrer). **Nicht angewendet.** Offen: Entscheidung persönliche Links, CSP |
+> | 2 Rückrunde | ✅ Umschalter, Saison, `min_spieler`, CSV-Import mit Vorschau (Migration 04). Offen: echte Termine (nicht importiert), Mannschaftsstärken setzen |
+> | 3 Leitstand | ◐ Fehlerbehandlung, Anmerkungen, Erinnerung, Modale vereinheitlicht. Offen: Modularisierung, Inline-Handler → CSP, Kaderverwaltung |
+> | 4 Mobile | ◐ Tabellen scrollbar, Touch-Ziele, kein iOS-Zoom. Rest nach Designabstimmung |
+> | 5 Aufstellung/Kommunikation | ◐ Erinnerungstext. Rest offen |
+
 Stand: 09.11.2026 · Branch `develop/spielplan-app-2.0` · Basis: `main` @ `65ceb9f`
 
 Grundlage ist ausschließlich der Quellcode im Repository. Die Produktivdatenbank

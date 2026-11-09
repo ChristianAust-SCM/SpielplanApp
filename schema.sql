@@ -1,3 +1,11 @@
+-- ############################################################################
+-- VERALTET – NICHT VERWENDEN
+-- Dieses Schema v1 entspricht nicht dem Produktivstand (fehlende Tabellen,
+-- abweichende Constraints, unsichere Policies). Maßgeblich sind:
+--   supabase/baseline/00_produktion_rekonstruiert.sql  (Ist-Zustand, nur Tests)
+--   supabase/migrations/                               (Zielzustand)
+-- ############################################################################
+
 -- ============================================================
 -- Spielplan-App · Datenbankschema v1
 -- FC Strass / Tisch 7 · Saison 2026/27

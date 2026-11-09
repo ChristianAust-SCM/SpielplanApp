@@ -102,3 +102,19 @@ test('Migration 09 lässt anon nur Funktionen ausführen', () => {
   const grants = s.match(/grant [^;]+ to anon/gi) || [];
   assert.deepEqual(grants.map(g => g.replace(/\s+/g, ' ')), ['grant insert on public.vereinsbefragung to anon']);
 });
+
+test('Jeder RPC-Aufruf im Frontend passt zu einer Funktion in den Migrationen', () => {
+  const sql = MIGRATIONEN.map(lies).join('\n');
+  const aufrufe = [];
+  ALLE.forEach(f => {
+    for (const m of lies(f).matchAll(/sb\.rpc\('([a-z_]+)',\s*\{([^}]*)\}/g)) {
+      aufrufe.push({ f, name: m[1], params: [...m[2].matchAll(/\b(p_[a-z_]+)\s*:/g)].map(x => x[1]) });
+    }
+  });
+  assert.ok(aufrufe.length >= 8, 'RPC-Aufrufe gefunden: ' + aufrufe.length);
+  aufrufe.forEach(a => {
+    const def = new RegExp('create or replace function public\\.' + a.name + '\\(([^)]*(?:\\([^)]*\\)[^)]*)*)\\)', 'i').exec(sql);
+    assert.ok(def, a.f + ': Funktion public.' + a.name + ' fehlt');
+    a.params.forEach(p => assert.match(def[1], new RegExp('\\b' + p + '\\b'), a.f + ': Parameter ' + p + ' fehlt in ' + a.name));
+  });
+});
