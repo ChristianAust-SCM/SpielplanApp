@@ -121,10 +121,7 @@ freigegebenen Commit.
 
 ## 7. Staging (echter Stack + Browser)
 
-Vorbereitet, aber noch nicht ausgeführt: `docs/STAGING.md`, `scripts/staging.sh lauf01`.
-Benötigt deine Freigabe für zwei Einmalschritte: Supabase-Images laden und
-Playwright installieren. Der Staging-Test ist für 01 **empfohlen, aber nicht zwingend**:
-01 nutzt nur Postgres-Policies, und PostgREST setzt dieselben Rollen wie die Tests.
+Ausgeführt am 10.11.2026 (Variante A freigegeben), **bestanden**. Ergebnis siehe §9.
 
 ## 8. Git
 
@@ -136,3 +133,38 @@ Playwright installieren. Der Staging-Test ist für 01 **empfohlen, aber nicht zw
 | *dieser Commit* | Abgleich Baseline mit Produktion, Migration 05 (6/6/4), Staging-Vorbereitung, dieser Bericht |
 
 `main` unverändert @ `65ceb9f`, kein Push.
+
+## 9. Staging-Lauf 01 (10.11.2026, Austicore, lokal)
+
+* Umgebung:
+  * Supabase-CLI 3.0.0, offizielle Images: Postgres 17.11, PostgREST 16.5,
+    GoTrue 2.197, Kong 2.8.1. Produktion läuft auf Postgres 17.6, kleiner Versionsunterschied.
+  * Browser: Chromium Desktop und WebKit iPhone 13 im Image
+    `mcr.microsoft.com/playwright:v1.49.1-noble`.
+  * Ressourcen: 4 CPU, 22 GiB RAM, 290 GB frei.
+* Daten: nur Baseline, synthetischer Seed und SR-Platzhalter. Das Frontend lief als
+  Kopie von `main`, auf den lokalen Stack umgeschrieben (Abbruch, falls die
+  produktive URL verbleibt). Jede Browser-Anfrage an Produktion wird blockiert und
+  lässt den Test fehlschlagen. Es gab keine.
+
+| Stufe | Ergebnis |
+|---|---|
+| Ist-Zustand | 8/8: Login MF/Admin, Spielerlink, SR-Platzhalter; Selbstvergabe per REST **gelingt** (HTTP 201, Lücke real nachgewiesen) |
+| nach Migration 01 | 9/9: gleiche Funktionen in beiden Browsern; Selbstvergabe → **HTTP 403**; MF-Hochstufung ändert 0 Zeilen; SR-Platzhalter lesen/schreiben wie vorher; Katalog außerhalb der Spielplan-Tabellen **unverändert** |
+| nach Rückfall R01 | 8/8: Ausgangszustand wieder da; Katalog **exakt** wie vorher |
+| Migration 01 erneut | 9/9 |
+
+**Fehler und Korrekturen:**
+
+1. Die Host-Browser starteten nicht, weil Systembibliotheken fehlen. Eine `apt`-Installation
+   wäre systemweit gewesen; stattdessen läuft Playwright im offiziellen Image.
+2. `lauf01` lief durch, kehrte aber nicht zurück: Der Webserver hielt die Ausgabe offen.
+   Behoben mit `setsid`, `</dev/null` und `--directory`; der Stack wird am Ende
+   automatisch beendet.
+3. Ergänzt wurden Prüfungen gegen Produktionszugriffe, Katalogvergleiche gegen den
+   echten Stack und der SR-Platzhalter-Test.
+
+Danach Neustart von `lauf01`: Exit 0, 34/34 bestanden. Staging-Container und
+-Volumes sind entfernt; die bestehenden Container (freelab, n8n, portainer) liefen
+durchgehend unverändert.
+

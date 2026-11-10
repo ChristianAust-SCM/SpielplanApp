@@ -20,6 +20,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SW="$ROOT/staging"
+PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v1.49.1-noble"
 DBURL="postgresql://postgres:postgres@127.0.0.1:55322/postgres"
 PROD_URL_RE='https://nwutgxjnverlvmkrpiep\.supabase\.co'
 PROD_KEY_RE='sb_publishable_[A-Za-z0-9_-]+'
@@ -65,14 +66,22 @@ frontend() {
     -e "s#${PROD_URL_RE}#${API_URL}#g" -e "s#${PROD_KEY_RE}#${ANON_KEY}#g" \
     -e "s#https://spielplanapp\.christianaust\.eu/#http://127.0.0.1:${port}/#g"
   if grep -rqE "$PROD_URL_RE" "$dir"; then echo "✗ produktive URL noch enthalten – Abbruch" >&2; exit 1; fi
-  (cd "$dir" && nohup python3 -m http.server "$port" --bind 127.0.0.1 >"$SW/http-$art.log" 2>&1 & echo $! > "$SW/http-$art.pid")
+  setsid python3 -m http.server "$port" --bind 127.0.0.1 --directory "$dir" \
+    </dev/null >"$SW/http-$art.log" 2>&1 &
+  echo $! > "$SW/http-$art.pid"
   echo "✓ Frontend $art: http://127.0.0.1:$port/ (gegen lokalen Stack)"
 }
 
 smoke() {
   local stufe="$1"
   lokale_werte
-  STAGING_API_URL="$API_URL" STAGING_ANON_KEY="$ANON_KEY" STAGING_STUFE="$stufe" npx --no-install playwright test --config "$ROOT/tests/e2e/playwright.config.js"
+  # Browser laufen im offiziellen Playwright-Image (bringt die Systembibliotheken
+  # mit, keine Installation auf dem Host). --network host: nur 127.0.0.1-Ziele.
+  docker run --rm --network host --ipc host --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp -e CI=1 \
+    -e STAGING_API_URL="$API_URL" -e STAGING_ANON_KEY="$ANON_KEY" -e STAGING_STUFE="$stufe" \
+    -v "$ROOT:/work" -w /work "$PLAYWRIGHT_IMAGE" \
+    npx --no-install playwright test --config tests/e2e/playwright.config.js --output /tmp/pw-out
 }
 
 stop() {
@@ -87,11 +96,22 @@ case "${1:-}" in
   frontend) frontend "$2" ;;
   smoke)    smoke "$2" ;;
   lauf01)
+    stop >/dev/null 2>&1 || true
+    trap 'stop >/dev/null 2>&1 || true' EXIT
     start; frontend alt
+    snap() { psqlf -v bereich="$1" -f "$ROOT/supabase/tests/_katalog_snapshot.sql" > "$SW/snap_$2.txt"; }
+    snap alle vorher; snap sr vorher_sr
+    smoke ist
+    psqlf -f "$(migration_datei 01)"; snap sr nach01_sr
+    diff -u "$SW/snap_vorher_sr.txt" "$SW/snap_nach01_sr.txt" \
+      && echo "✓ SR/übrige Objekte nach 01 unverändert (echter Stack)"
+    smoke 01
+    psqlf -f "$(migration_datei R01)"; snap alle nachR01
+    diff -u "$SW/snap_vorher.txt" "$SW/snap_nachR01.txt" \
+      && echo "✓ R01 stellt den Katalog exakt wieder her (echter Stack)"
     smoke ist
     psqlf -f "$(migration_datei 01)"; smoke 01
-    psqlf -f "$(migration_datei R01)"; smoke ist
-    psqlf -f "$(migration_datei 01)"; smoke 01
+    rm -f "$SW"/snap_*.txt
     echo "✓ Staging-Lauf Migration 01 bestanden" ;;
   stop)     stop ;;
   *) sed -n 2,20p "$0"; exit 2 ;;

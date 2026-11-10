@@ -41,6 +41,20 @@ function rest(pfad, jwt, init = {}) {
   });
 }
 
+// Isolation: jeder Datenzugriff des Browsers muss an den lokalen Stack gehen.
+let produktivAnfragen = [];
+test.beforeEach(async ({ page }) => {
+  produktivAnfragen = [];
+  page.on('request', (req) => {
+    const host = new URL(req.url()).hostname;
+    if (host.endsWith('supabase.co') || host.endsWith('christianaust.eu')) produktivAnfragen.push(host);
+  });
+  await page.route(/supabase\.co|christianaust\.eu/, (route) => route.abort());
+});
+test.afterEach(() => {
+  expect(produktivAnfragen, 'Browser darf Produktion nie ansprechen').toEqual([]);
+});
+
 test.describe(`Altes Frontend · Stufe ${STUFE}`, () => {
   test('MF-Anmeldung zeigt genau die eigene Mannschaft', async ({ page }) => {
     await anmelden(page, 'mf1@test.invalid');
@@ -84,5 +98,15 @@ test.describe(`Altes Frontend · Stufe ${STUFE}`, () => {
     expect(await r.json()).toEqual([]);                  // keine Zeile geändert
     const l = await rest(`nutzer_rollen?select=rolle,mannschaft_id&user_id=eq.${MF1}`, jwt);
     expect(await l.json()).toEqual([{ rolle: 'mf', mannschaft_id: M1 }]);
+  });
+
+  test('SR-Platzhalter: anon liest und schreibt wie vorher', async ({}, info) => {
+    test.skip(info.project.name !== 'chromium-desktop', 'REST-Prüfung nur einmal');
+    const anon = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+    const l = await fetch(`${API}/rest/v1/sr_platzhalter?select=id`, { headers: anon });
+    expect(l.status).toBe(200);
+    const i = await fetch(`${API}/rest/v1/sr_platzhalter`, {
+      method: 'POST', headers: anon, body: JSON.stringify({ wert: `smoke-${STUFE}` }) });
+    expect(i.status).toBe(201);
   });
 });

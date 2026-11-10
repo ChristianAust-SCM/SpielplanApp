@@ -14,6 +14,16 @@ Stacks. Das Skript bricht ab, falls die produktive URL noch enthalten ist.
 | `tests/e2e/migration01.spec.js` | Browser- und REST-Smoke-Tests für das alte Frontend: Ist-Zustand und nach 01 |
 | `tests/e2e/playwright.config.js` | Chromium (Desktop) und WebKit (iPhone 13) |
 
+Die Browser laufen im offiziellen Image `mcr.microsoft.com/playwright:v1.49.1-noble`
+(`--network host`). Auf dem Host fehlen Systembibliotheken für die Browser, und eine
+`apt`-Installation wäre systemweit. Die Specs blockieren und melden jede Browser-Anfrage
+an `*.supabase.co` oder `*.christianaust.eu`.
+
+**Hinweis Netz:** Die Supabase-CLI bindet API (55321), DB (55322) und Mailpit
+(55324) an `0.0.0.0`, also an alle Schnittstellen. Das lässt sich in der CLI nicht
+einschränken. Die Umgebung enthält nur synthetische Daten und lokale
+Standardschlüssel, und `lauf01` beendet sie am Ende automatisch.
+
 Beim Start enthält die Datenbank die Baseline. Das ist der Ist-Zustand, am
 10.11.2026 mit den produktiven Spalten abgeglichen. Dazu kommen die Testdaten
 und die SR-Platzhalter.
@@ -31,7 +41,12 @@ Spätere Stufen, gleiche Umgebung: `migriere 02/03/04/05`, `frontend neu`,
 danach `migriere 09`. Die Smoke-Specs für das neue Frontend folgen nach
 Freigabe von 01.
 
-## Voraussetzungen (Einmalschritte, brauchen deine Freigabe)
+## Ergebnis 10.11.2026
+
+`scripts/staging.sh lauf01`: **bestanden** (Exit 0), 34 Browser-/REST-Tests in 4 Stufen,
+2 Katalogvergleiche gegen den echten Stack. Details: `docs/FREIGABE_MIGRATION01_2026-11-10.md` §9.
+
+## Voraussetzungen (am 10.11.2026 erledigt)
 
 * **Docker-Images des Supabase-Stacks laden.** `supabase start` lädt beim ersten
   Lauf etwa 8 Images (GoTrue, PostgREST, Kong u. a., mehrere GB). Lokal liegt
@@ -39,8 +54,10 @@ Freigabe von 01.
 * **Playwright projektlokal installieren:**
   `npm install -D @playwright/test@1.49.1 && npx playwright install chromium webkit`.
   Das schreibt in `node_modules/` und in den Browser-Cache unter `~/.cache/ms-playwright`.
-* `npm` ist im Pfad dieser Sitzung nicht vorhanden. Nur `~/.local/bin/node` ist da.
-  Entweder npm bereitstellen oder den Pfad nennen.
+* `npm`/`npx`: benutzerlokal nach `~/.local/bin` verlinkt, wie `node` aus `~/.hermes/node/bin`.
+* Playwright 1.49.1 projektlokal (`package.json`, exakte Version). Die Host-Browser in
+  `~/.cache/ms-playwright` (1,1 GB) sind ohne Systembibliotheken nicht lauffähig und können
+  gelöscht werden.
 * Das alte Frontend lädt `supabase-js` vom CDN. Der Browser braucht dafür
   Internetzugang. Die Datenzugriffe gehen trotzdem nur an `127.0.0.1`.
 

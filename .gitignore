@@ -15,3 +15,4 @@ staging/http-*.pid
 test-results/
 playwright-report/
 supabase/.temp/
+staging/supabase/.branches/

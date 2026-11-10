@@ -10,6 +10,7 @@
     "test:staging01": "bash scripts/staging.sh lauf01"
   },
   "devDependencies": {
+    "@playwright/test": "1.49.1",
     "jsdom": "25.0.1"
   }
 }
