@@ -77,6 +77,26 @@ function modalSchliessen() {
 }
 const X_BTN = '<button onclick="this.closest(\'.sp-modal\').remove()" aria-label="Schließen" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>';
 
+// Feste Symbole in die statische Seite einsetzen (nur Konstanten, keine Daten)
+function symboleEinsetzen() {
+  document.querySelectorAll('[data-sym]').forEach(function (el) {
+    const f = SYM[el.getAttribute('data-sym')];
+    if (f) el.outerHTML = f(el.className);
+  });
+  const logo = document.getElementById('marke-logo');
+  if (logo) logo.outerHTML = SYM.marke();
+  const ex = document.getElementById('export-sym');
+  if (ex) ex.outerHTML = SYM.laden('sym-s');
+}
+
+function renderNutzer(email) {
+  const rolle = istAdmin ? 'Admin' : 'Mannschaftsführer';
+  document.getElementById('header-status').innerHTML =
+    '<span class="nutzer-bild">' + SYM.nutzer() + '</span>' +
+    '<div><div class="nutzer-rolle">' + esc(rolle) + '</div><div class="nutzer-mail" title="' + esc(email) + '">' + esc(email) + '</div></div>' +
+    '<button class="nutzer-ab" onclick="abmelden()" title="Abmelden" aria-label="Abmelden">' + SYM.abmelden('sym-s') + '<span class="nutzer-ab-text">Abmelden</span></button>';
+}
+
 // ============================================================
 // Start
 // ============================================================
@@ -90,8 +110,7 @@ async function init() {
   const userId = sessionData.session.user.id;
   const email  = sessionData.session.user.email;
 
-  document.getElementById('header-status').innerHTML =
-    esc(email) + ' &nbsp;·&nbsp; <a href="#" onclick="abmelden();return false" style="color:var(--muted);text-decoration:underline;font-size:12px">Abmelden</a>';
+  renderNutzer(email);
   document.getElementById('config-hint').style.display = 'none';
 
   try {
@@ -101,6 +120,7 @@ async function init() {
       .eq('user_id', userId));
 
     istAdmin = rollen.some(r => r.rolle === 'admin');
+    renderNutzer(email);
 
     alleMannschaften = rollen
       .filter(r => r.mannschaften)
@@ -135,7 +155,7 @@ function renderTabs() {
   const el = document.getElementById('tabs');
   let html = alleMannschaften.map(m =>
     '<button class="tab" onclick="ladeMannschaft(\'' + uuidOderLeer(m.id) + '\')" data-id="' + esc(m.id) + '">' +
-      esc(m.name) + ' <span style="font-size:11px;opacity:.7">· ' + esc(m.liga) + '</span>' +
+      SYM.team() + '<span>' + esc(m.name) + ' <span class="tab-liga">· ' + esc(m.liga) + '</span></span>' +
     '</button>'
   ).join('');
 
@@ -171,7 +191,7 @@ function renderRundenUmschalter() {
       '<button class="tab' + (h === aktiveHalbrunde ? ' active' : '') + '" onclick="setzeHalbrunde(\'' + (h === 'Vorrunde' ? 'Vorrunde' : 'Rückrunde') + '\')">' + esc(h) + '</button>'
     ).join('') +
     saisonAuswahl +
-    (istAdmin ? '<button class="tab" onclick="zeigeImportModal()" title="Spieltermine aus CSV importieren">⬆ Termine importieren</button>' : '');
+    (istAdmin ? '<button class="tab tab-aktion" onclick="zeigeImportModal()" title="Spieltermine aus CSV importieren">' + SYM.hochladen() + 'Termine importieren</button>' : '');
 }
 
 function setzeHalbrunde(h) {
@@ -195,6 +215,13 @@ function filtereUndZeichne() {
   alleTermine = SPRunde.filterTermine(alleTermineMannschaft, aktiveHalbrunde, aktiveSaison);
   const titel = document.getElementById('section-title');
   if (titel) titel.textContent = aktiveHalbrunde + ' ' + aktiveSaison;
+  const meta = document.getElementById('section-meta');
+  if (meta) {
+    const kurz = { day: '2-digit', month: '2-digit', year: '2-digit' };
+    meta.textContent = alleTermine.length === 0 ? '' :
+      alleTermine.length + (alleTermine.length === 1 ? ' Spieltag' : ' Spieltage') + '  ·  ' +
+      fmt(alleTermine[0].datum, kurz) + ' – ' + fmt(alleTermine[alleTermine.length - 1].datum, kurz);
+  }
   renderRundenUmschalter();
   renderStats();
   renderTabelle();
@@ -322,26 +349,20 @@ function rueckmeldungAlt(altTermine) {
     const gesamt  = alleVerfueg.filter(v => v.alternativtermin_id === at.id && aktiveIds.has(v.spieler_id)).length;
     const fehlen  = Math.max(0, kader - gesamt);
     const ad      = fmt(at.datum, { day:'2-digit', month:'2-digit' });
-    const farbe   = gesamt === 0 ? '#8996B4' : fehlen === 0 ? '#4FD4A8' : '#F08080';
-    const bg      = gesamt === 0 ? 'rgba(137,150,180,0.1)' : fehlen === 0 ? 'rgba(29,158,117,0.12)' : 'rgba(226,75,74,0.12)';
-    const label   = gesamt === 0 ? 'offen' : fehlen === 0 ? 'alle ✓' : fehlen + ' fehlen';
-    return '<div style="margin-bottom:5px;cursor:pointer" onclick="zeigeFehlende(\'' + uuidOderLeer(at.spieltermin_id) + '\',\'' + uuidOderLeer(at.id) + '\')">' +
-      '<div style="font-size:11px;color:#8996B4;margin-bottom:2px">Alt.' + (i+1) + ' · ' + esc(ad) + '</div>' +
-      '<div style="font-size:14px;font-weight:500;color:var(--white)">' + gesamt + ' / ' + kader + '</div>' +
-      '<div style="display:inline-block;padding:1px 7px;border-radius:10px;background:' + bg + ';font-size:11px;font-weight:600;color:' + farbe + '">' + label + '</div>' +
+    const pill    = gesamt === 0 ? '<span class="pill pill-offen">offen</span>'
+                  : fehlen === 0 ? '<span class="pill pill-alle">alle ✓</span>'
+                  : '<span class="pill pill-fehlen">' + fehlen + ' fehlen</span>';
+    return '<div class="rm-alt" onclick="zeigeFehlende(\'' + uuidOderLeer(at.spieltermin_id) + '\',\'' + uuidOderLeer(at.id) + '\')">' +
+      '<div class="rm-alt-titel">Alt.' + (i+1) + ' · ' + esc(ad) + '</div>' +
+      '<div class="rm-zahl">' + gesamt + ' / ' + kader + '</div>' + pill +
     '</div>';
   }).join('');
 }
 
 function antwortBadges(ja, viel, nein, klein) {
-  const p = klein ? '1px 6px' : '2px 8px', fs = klein ? '11px' : '12px', dot = klein ? '5px' : '6px', r = klein ? '8px' : '10px';
-  const badge = (bg, fg, punkt, text) =>
-    '<span style="display:inline-flex;align-items:center;gap:3px;padding:' + p + ';border-radius:' + r + ';background:' + bg + ';font-size:' + fs + ';font-weight:700;color:' + fg + '">' +
-      '<span style="width:' + dot + ';height:' + dot + ';border-radius:50%;background:' + punkt + ';display:inline-block;"></span>' + text +
-    '</span>';
-  return badge('#E1F5EE', '#085041', '#1D9E75', ja + ' Ja') +
-         badge('#FAEEDA', '#633806', '#EF9F27', viel + ' Vllt.') +
-         badge('#FCEBEB', '#791F1F', '#E24B4A', nein + ' Nein');
+  const k = klein ? ' pill-k' : '';
+  const badge = (art, text) => '<span class="pill pill-' + art + k + '"><span class="pill-punkt"></span>' + text + '</span>';
+  return badge('ja', ja + ' Ja') + badge('viel', viel + ' Vllt.') + badge('nein', nein + ' Nein');
 }
 
 // ============================================================
@@ -352,7 +373,7 @@ function renderTabelle() {
   if (alleTermine.length === 0) {
     document.getElementById('table-container').innerHTML =
       '<div class="loading" style="padding:40px">Keine Spieltermine in der ' + esc(aktiveHalbrunde) + ' ' + esc(aktiveSaison || '') + ' vorhanden.' +
-      (istAdmin && aktiveHalbrunde === 'Rückrunde' ? '<br><span style="font-size:13px">Termine können über „⬆ Termine importieren“ als CSV eingelesen werden.</span>' : '') +
+      (istAdmin && aktiveHalbrunde === 'Rückrunde' ? '<br><span style="font-size:13px">Termine können über „Termine importieren“ als CSV eingelesen werden.</span>' : '') +
       '</div>';
     return;
   }
@@ -365,6 +386,7 @@ function renderTabelle() {
     const txt = ampelText(t.id);
     const rm  = rueckmeldungText(t.id);
     const link = abfrageLink(t.abfrage_token);
+    const ampel = ampelKlasse(t.id);
 
     waTexte['t:' + t.id] = SPTexte.abfrageText({
       heim: t.heim, gegner: t.gegner,
@@ -373,94 +395,95 @@ function renderTabelle() {
     });
 
     const statusBadge = t.status === 'Verschoben'
-      ? '<span style="color:#F0B429;font-size:11px;font-weight:700"> · ALTERNATIVTERMIN</span>'
+      ? '<span class="datum-status">· ALTERNATIVTERMIN</span>'
       : t.status === 'Verschiebung nötig'
-      ? '<span style="color:#F07830;font-size:11px;font-weight:700"> · VERSCHIEBUNG NÖTIG</span>'
+      ? '<span class="datum-status noetig">· VERSCHIEBUNG NÖTIG</span>'
       : '';
 
     const altTermineInfo = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);
     const aktiveIds = kaderIds();
 
     const altInfo = altTermineInfo.length > 0
-      ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">' +
-          altTermineInfo.map(function(at, i) {
-            const ad   = fmt(at.datum, { weekday:'short', day:'2-digit', month:'2-digit' });
-            const auhr = uhr(at.uhrzeit);
-            const av   = alleVerfueg.filter(v => v.alternativtermin_id === at.id && aktiveIds.has(v.spieler_id));
-            return '<div style="background:rgba(212,98,10,0.08);border-radius:6px;padding:4px 8px;margin-bottom:2px">' +
-              '<div style="font-size:11px;color:#F07830;font-weight:700;margin-bottom:2px">Alt.' + (i+1) + ': ' + esc(ad) + (auhr ? ' · ' + esc(auhr) + ' Uhr' : '') + '</div>' +
-              '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
-                antwortBadges(av.filter(v => v.antwort === 'Ja').length, av.filter(v => v.antwort === 'Vielleicht').length, av.filter(v => v.antwort === 'Nein').length, true) +
-              '</div>' +
-            '</div>';
-          }).join('') +
-        '</div>'
+      ? altTermineInfo.map(function(at, i) {
+          const ad   = fmt(at.datum, { weekday:'short', day:'2-digit', month:'2-digit' });
+          const auhr = uhr(at.uhrzeit);
+          const av   = alleVerfueg.filter(v => v.alternativtermin_id === at.id && aktiveIds.has(v.spieler_id));
+          return '<div class="alt-box">' +
+            '<div class="alt-box-titel">Alt.' + (i+1) + ': ' + esc(ad) + (auhr ? ' · ' + esc(auhr) + ' Uhr' : '') + '</div>' +
+            '<div class="badges">' +
+              antwortBadges(av.filter(v => v.antwort === 'Ja').length, av.filter(v => v.antwort === 'Vielleicht').length, av.filter(v => v.antwort === 'Nein').length, true) +
+            '</div>' +
+          '</div>';
+        }).join('')
       : '';
 
     // Nur 'Verschiebung nötig' gilt als offen; 'Verschoben' ist ein vollwertiger Termin.
     const istAlternativ = t.status === 'Verschiebung nötig';
-    const rowStyle      = istAlternativ ? 'opacity:0.45;' : '';
+    // Kritisch: zu wenige Zusagen für die Mindeststärke (wie Kennzahl „Zu wenig“)
+    const istKritisch   = !istAlternativ && (ampel === 'crit' || ampel === 'warn');
+    const zeilenKlasse  = istAlternativ ? 'zeile-offen-verlegung' : istKritisch ? 'zeile-kritisch' : '';
 
     let datumBlock;
     if (istAlternativ && altTermineInfo.length > 0) {
       const altDaten = altTermineInfo.map(function(at, i) {
         const ad   = fmt(at.datum, { weekday:'short', day:'2-digit', month:'2-digit', year:'2-digit' });
         const auhr = uhr(at.uhrzeit);
-        return '<div style="font-size:12px;color:#F07830;font-weight:700">↔ Alt.' + (i+1) + ': ' + esc(ad) + (auhr ? ' ' + esc(auhr) + ' Uhr' : '') + '</div>';
+        return '<div class="datum-alt">↔ Alt.' + (i+1) + ': ' + esc(ad) + (auhr ? ' ' + esc(auhr) + ' Uhr' : '') + '</div>';
       }).join('');
       datumBlock = '<div class="datum-block">' +
-        '<div class="datum-main" style="color:#8996B4;text-decoration:line-through">' + esc(wt) + ', ' + esc(dt) + '</div>' +
+        '<div class="datum-main datum-alt-alt">' + esc(wt) + ', ' + esc(dt) + '</div>' +
         altDaten +
       '</div>';
     } else {
-      datumBlock = '<div class="datum-block"><div class="datum-main">' + esc(wt) + ', ' + esc(dt) + statusBadge + '</div><div class="datum-sub">' + esc(u) + '</div></div>';
+      datumBlock = '<div class="datum-block"><div class="datum-main">' + esc(wt) + ', ' + esc(dt) + statusBadge + '</div>' +
+        (u ? '<div class="datum-sub">' + SYM.uhr() + esc(u) + '</div>' : '') + '</div>';
     }
 
-    const _btnBase = 'display:inline-flex;align-items:center;justify-content:center;width:30px;height:28px;border-radius:7px;border:none;cursor:pointer;padding:0;';
+    const verlegung = istKritisch
+      ? '<button class="ak-verlegung" onclick="meldeVerschiebung(\'' + tid + '\')" title="Zu wenige Zusagen – Alternativtermin prüfen" aria-label="Verlegung prüfen">' + SYM.warnung() + 'Verlegung prüfen</button>'
+      : '';
     const aktionButtons = istAlternativ
-      ? '<button onclick="meldeVerschiebung(\'' + tid + '\')" title="Alternativtermin läuft" aria-label="Alternativtermin" style="' + _btnBase + 'background:#D4620A;color:#fff;font-size:15px;font-weight:700">↔</button>'
-      : '<a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer" title="Link öffnen" aria-label="Link öffnen" style="' + _btnBase + 'background:#D4A017;color:#1a1000;text-decoration:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a1000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></a>' +
-        '<button onclick="kopierenWA(this, \'t:' + tid + '\')" title="WhatsApp-Text kopieren" aria-label="WhatsApp" style="' + _btnBase + 'background:#25D366"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M11.914 0C5.34 0 0 5.34 0 11.914c0 2.11.549 4.094 1.508 5.818L0 24l6.459-1.474a11.882 11.882 0 005.455 1.32c6.573 0 11.914-5.34 11.914-11.914C23.828 5.34 18.487 0 11.914 0zm0 21.828a9.914 9.914 0 01-5.032-1.369l-.361-.214-3.734.852.87-3.638-.235-.374A9.865 9.865 0 012 11.914C2 6.443 6.443 2 11.914 2c5.472 0 9.914 4.443 9.914 9.914 0 5.472-4.442 9.914-9.914 9.914z"/></svg></button>' +
-        '<button onclick="meldeVerschiebung(\'' + tid + '\')" title="Alternativtermin" aria-label="Alternativtermin" style="' + _btnBase + 'background:#D4620A;color:#fff;font-size:15px;font-weight:700">↔</button>' +
-        '<button onclick="zeigeAufstellung(\'' + tid + '\')" title="Aufstellung festlegen" aria-label="Aufstellung" style="' + _btnBase + 'background:#1D9E75"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></button>';
+      ? '<button class="ak ak-alt" onclick="meldeVerschiebung(\'' + tid + '\')" title="Alternativtermin läuft" aria-label="Alternativtermin">' + SYM.tausch() + '</button>'
+      : verlegung +
+        '<a class="ak ak-link" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer" title="Abfragelink öffnen" aria-label="Link öffnen">' + SYM.link() + '</a>' +
+        '<button class="ak ak-wa" onclick="kopierenWA(this, \'t:' + tid + '\')" title="WhatsApp-Text kopieren" aria-label="WhatsApp">' + SYM.whatsapp() + '</button>' +
+        '<button class="ak ak-alt" onclick="meldeVerschiebung(\'' + tid + '\')" title="Alternativtermin" aria-label="Alternativtermin">' + SYM.tausch() + '</button>' +
+        '<button class="ak ak-auf" onclick="zeigeAufstellung(\'' + tid + '\')" title="Aufstellung festlegen" aria-label="Aufstellung">' + SYM.team() + '</button>';
 
-    return '<tr style="' + rowStyle + '">' +
-      '<td>' + datumBlock + '</td>' +
-      '<td><span class="ha-badge ' + (t.heim ? 'ha-h' : 'ha-a') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
-      '<td style="font-weight:700">' + esc(t.gegner) +
+    const rueckmeldung = istAlternativ && altTermineInfo.length > 0
+      ? rueckmeldungAlt(altTermineInfo)
+      : rm
+        ? '<button class="rm-knopf" onclick="zeigeFehlende(\'' + tid + '\',null)" title="Rückmeldungen anzeigen">' +
+            '<span class="rm-zahl' + (rm.fehlen === 0 ? ' voll' : '') + '">' + rm.gesamt + ' / ' + rm.kader + '</span>' +
+            (rm.fehlen === 0 ? '<span class="pill pill-alle">✓ alle</span>' : '<span class="pill pill-fehlen">' + rm.fehlen + ' fehlen</span>') +
+          '</button>'
+        : '<button class="rm-knopf rm-leer" onclick="zeigeFehlende(\'' + tid + '\',null)" title="Rückmeldungen anzeigen">–</button>';
+
+    return '<tr class="' + zeilenKlasse + '">' +
+      '<td><div class="zelle-datum">' + SYM.kalender() + datumBlock + '</div></td>' +
+      '<td><span class="pill ' + (t.heim ? 'pill-heim' : 'pill-ausw') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span></td>' +
+      '<td><div class="zelle-gegner">' + SYM.wappen() + '<span class="gegner-name">' + esc(t.gegner) + '</span>' +
         (alleAufstellungen.some(a => a.spieltermin_id === t.id)
-          ? '<span title="Aufstellung gesetzt" style="display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:2px 8px;border-radius:8px;background:rgba(29,158,117,0.18);color:#4FD4A8;font-size:10px;font-weight:700;vertical-align:middle;text-transform:uppercase;letter-spacing:0.05em">✓ Aufstellung</span>'
+          ? '<span class="pill pill-auf" title="Aufstellung gesetzt">✓ Aufstellung</span>'
           : '') +
-      '</td>' +
+      '</div></td>' +
       '<td>' + (txt
-        ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">' + antwortBadges(txt.ja, txt.vielleicht, txt.nein, false) + '</div>'
-        : '<span style="font-size:13px;color:#8996B4;">–</span>') + altInfo + '</td>' +
-      '<td>' + (istAlternativ && altTermineInfo.length > 0
-        ? rueckmeldungAlt(altTermineInfo)
-        : rm
-          ? '<button onclick="zeigeFehlende(\'' + tid + '\',null)" style="background:none;border:none;cursor:pointer;text-align:left;padding:0">' +
-              '<div style="line-height:1.5">' +
-                '<div style="font-size:15px;font-weight:700;color:' + (rm.fehlen === 0 ? '#4FD4A8' : '#F7F9FF') + '">' + rm.gesamt + ' / ' + rm.kader + '</div>' +
-                '<div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:2px;' +
-                  (rm.fehlen === 0 ? 'background:rgba(29,158,117,0.15);color:#4FD4A8' : 'background:rgba(226,75,74,0.15);color:#F08080') + '">' +
-                  (rm.fehlen === 0 ? '✓ alle' : rm.fehlen + ' fehlen') +
-                '</div>' +
-              '</div>' +
-            '</button>'
-          : '<button onclick="zeigeFehlende(\'' + tid + '\',null)" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px;color:var(--muted)">–</button>') + '</td>' +
-      '<td style="vertical-align:middle"><div style="display:flex;gap:4px;align-items:center;flex-wrap:nowrap">' + aktionButtons + '</div></td>' +
+        ? '<div class="badges">' + antwortBadges(txt.ja, txt.vielleicht, txt.nein, false) + '</div>'
+        : '<span class="rm-leer">–</span>') + altInfo + '</td>' +
+      '<td>' + rueckmeldung + '</td>' +
+      '<td><div class="aktionen">' + aktionButtons + '</div></td>' +
     '</tr>';
   }).join('');
 
   document.getElementById('table-container').innerHTML =
-    '<div class="table-scroll">' +
+    '<div class="tabellen-rahmen"><div class="table-scroll">' +
     '<table class="spielplan-table">' +
       '<thead><tr>' +
-        '<th>Datum</th><th>H/A</th><th>Gegner</th><th>Verfügbarkeit</th><th>Rückmeldung</th><th>Aktion</th>' +
+        '<th>Datum</th><th>H/A</th><th>Gegner</th><th>Verfügbarkeit</th><th>Rückmeldung</th><th style="text-align:right">Aktion</th>' +
       '</tr></thead>' +
       '<tbody>' + rows + '</tbody>' +
     '</table>' +
-    '</div>';
+    '</div></div>';
 }
 
 // ============================================================
@@ -886,43 +909,93 @@ function zeigeFehlende(terminId, altTerminId) {
     });
   }
 
+  // Lage des Termins (gleiche Regeln wie die Ampel in der Übersicht)
+  const votes = alleVerfueg.filter(v => passend(v) && kaderIds().has(v.spieler_id));
+  const zahl  = a => votes.filter(v => v.antwort === a).length;
+  const ja = zahl('Ja'), viel = zahl('Vielleicht'), nein = zahl('Nein');
+  const min = minSpieler();
+  const lage = votes.length === 0 ? 'offen' : ja >= min ? 'ok' : ja >= min - 2 ? 'warn' : 'crit';
+  const lageText = {
+    offen: ['Noch keine Rückmeldungen', 'Abfragelink per WhatsApp verschicken.'],
+    ok:    ['Spielbereit', ja + ' Zusagen – Mindeststärke ' + min + ' erreicht.'],
+    warn:  ['Knapp – zu wenig Zusagen', ja + ' von mindestens ' + min + ' Zusagen. Noch ' + (min - ja) + ' fehlen.'],
+    crit:  ['Kritisch – Verlegung prüfen', ja + ' von mindestens ' + min + ' Zusagen. Noch ' + (min - ja) + ' fehlen.']
+  }[lage];
+  const lageSym = lage === 'ok' ? SYM.haken() : lage === 'offen' ? SYM.uhr() : SYM.warnung();
+  const verlegenKnopf = (lage === 'crit' || lage === 'warn') && !altTermin && termin.status !== 'Verschiebung nötig'
+    ? '<button class="knopf knopf-gefahr knopf-klein" onclick="this.closest(\'.sp-modal\').remove();meldeVerschiebung(\'' + uuidOderLeer(terminId) + '\')">' + SYM.tausch('sym-s') + 'Alternativtermin</button>'
+    : '';
+
+  const initialen = n => SPS.anzeigeName(n).split(' ').filter(Boolean).slice(0, 2).map(w => w.charAt(0)).join('').toUpperCase();
+  const pillArt = { 'Ja': 'ja', 'Vielleicht': 'viel', 'Nein': 'nein' };
+
   const fehlenHtml = nochNicht.length === 0
-    ? '<div style="font-size:13px;color:#4FD4A8;padding:8px 0">✓ Alle haben geantwortet!</div>'
+    ? '<div class="dt-alle">' + SYM.haken('sym-s') + 'Alle haben geantwortet!</div>'
     : nochNicht.map(s =>
-        '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#1e3048;border-radius:6px;margin-bottom:6px">' +
-          '<span style="font-size:13px;color:#F7F9FF">' + esc(SPS.anzeigeName(s.name)) + '</span>' +
-          '<span style="font-size:11px;color:#F08080;font-weight:700">Keine Antwort</span>' +
+        '<div class="rm-zeile">' +
+          '<span class="rm-avatar">' + esc(initialen(s.name)) + '</span>' +
+          '<div class="rm-text"><div class="rm-kopf">' +
+            '<span class="rm-name">' + esc(SPS.anzeigeName(s.name)) + '</span>' +
+            '<span class="rm-keine">Keine Antwort</span>' +
+          '</div></div>' +
         '</div>'
       ).join('') +
-      '<button onclick="kopierenWA(this,\'e:' + uuidOderLeer(altTerminId || terminId) + '\')" style="margin-top:4px;padding:6px 12px;border-radius:6px;background:#25D366;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">💬 Erinnerung per WhatsApp</button>';
+      '<button class="knopf knopf-wa knopf-klein" style="margin-top:6px" onclick="kopierenWA(this,\'e:' + uuidOderLeer(altTerminId || terminId) + '\')">' + SYM.whatsapp('sym-s') + 'Erinnerung per WhatsApp</button>';
 
   const habenHtml = haben.map(s => {
     const v = alleVerfueg.find(v => passend(v) && v.spieler_id === s.id);
-    const farbe = v?.antwort === 'Ja' ? '#4FD4A8' : v?.antwort === 'Nein' ? '#F08080' : '#F0C060';
-    return '<div style="padding:8px 12px;background:#1e3048;border-radius:6px;margin-bottom:6px">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between">' +
-        '<span style="font-size:13px;color:#F7F9FF">' + esc(SPS.anzeigeName(s.name)) + '</span>' +
-        '<span style="font-size:11px;font-weight:700;color:' + farbe + '">' + esc(v?.antwort || '–') + '</span>' +
+    const art = pillArt[v?.antwort] || 'viel';
+    return '<div class="rm-zeile">' +
+      '<span class="rm-avatar">' + esc(initialen(s.name)) + '</span>' +
+      '<div class="rm-text">' +
+        '<div class="rm-kopf">' +
+          '<span class="rm-name">' + esc(SPS.anzeigeName(s.name)) + '</span>' +
+          '<span class="pill pill-' + art + '"><span class="pill-punkt"></span>' + esc(v?.antwort || '–') + '</span>' +
+        '</div>' +
+        (v && v.anmerkung ? '<div class="rm-notiz">' + esc(v.anmerkung) + '</div>' : '') +
       '</div>' +
-      (v && v.anmerkung ? '<div style="font-size:12px;color:#8996B4;margin-top:2px;white-space:pre-wrap;word-break:break-word">' + esc(v.anmerkung) + '</div>' : '') +
     '</div>';
   }).join('');
 
+  const zeit = altTermin ? '' : (termin.uhrzeit ? uhr(termin.uhrzeit) + ' Uhr' : '');
+  const dMitJahr = fmt(altTermin ? altTermin.datum : termin.datum, { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) +
+    (altTermin && altTermin.uhrzeit ? ' · ' + uhr(altTermin.uhrzeit) + ' Uhr' : '');
   modalOeffnen(
-    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:460px;width:100%;max-height:85vh;overflow-y:auto">' +
-      '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232">' +
-        '<div>' +
-          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:#F07830">' + esc(titel) + '</div>' +
-          '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + esc(d) + '</div>' +
-        '</div>' + X_BTN +
+    '<div class="dt">' +
+      '<div class="dt-kopf">' +
+        SYM.wappen() +
+        '<div style="min-width:0">' +
+          '<div class="dt-kicker">' +
+            '<span class="pill ' + (termin.heim ? 'pill-heim' : 'pill-ausw') + '">' + (termin.heim ? 'Heim' : 'Auswärts') + '</span>' +
+            '<span>' + esc(altTermin ? 'Alternativtermin' : 'Rückmeldungen') + '</span>' +
+
+          '</div>' +
+          '<div class="dt-titel" title="' + esc(titel) + '">' + esc(termin.gegner) + '</div>' +
+          '<div class="dt-meta">' +
+            '<span>' + SYM.kalender() + esc(dMitJahr) + '</span>' +
+            (zeit ? '<span>' + SYM.uhr() + esc(zeit) + '</span>' : '') +
+            (aktiveMannschaft ? '<span>' + SYM.team() + esc(aktiveMannschaft.name) + ' · ' + esc(aktiveMannschaft.liga) + '</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<button class="dt-zu" onclick="this.closest(\'.sp-modal\').remove()" aria-label="Schließen">' + SYM.kreuz() + '</button>' +
       '</div>' +
-      '<div style="padding:16px 20px">' +
+      '<div class="dt-inhalt">' +
+        '<div class="dt-lage ' + lage + '">' + lageSym +
+          '<div><div class="dt-lage-titel">' + esc(lageText[0]) + '</div><div class="dt-lage-text">' + esc(lageText[1]) + '</div></div>' +
+          verlegenKnopf +
+        '</div>' +
+        '<div class="dt-zahlen">' +
+          '<div class="dt-zahl ja"><b>' + ja + '</b><span>Ja</span></div>' +
+          '<div class="dt-zahl viel"><b>' + viel + '</b><span>Vielleicht</span></div>' +
+          '<div class="dt-zahl nein"><b>' + nein + '</b><span>Nein</span></div>' +
+          '<div class="dt-zahl offen"><b>' + nochNicht.length + '</b><span>Offen</span></div>' +
+        '</div>' +
         (nochNicht.length > 0
-          ? '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#F08080;margin-bottom:8px">Noch keine Antwort (' + nochNicht.length + ')</div>' +
+          ? '<div class="dt-gruppe fehlt">Noch keine Antwort (' + nochNicht.length + ')</div>' +
             fehlenHtml +
-            '<div style="height:1px;background:rgba(255,255,255,0.08);margin:14px 0"></div>'
+            '<div class="dt-trenner"></div>'
           : fehlenHtml) +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Haben geantwortet (' + haben.length + ')</div>' +
+        '<div class="dt-gruppe">Haben geantwortet (' + haben.length + ')</div>' +
         habenHtml +
       '</div>' +
     '</div>');
@@ -1209,4 +1282,5 @@ function kopiereHelferText(btn) {
 // ============================================================
 // Start
 // ============================================================
+symboleEinsetzen();
 init();

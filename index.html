@@ -7,308 +7,296 @@
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="css/premium.css">
   <style>
-    /* ── Reset & Basis ── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --navy:   #1e3550;
-      --navy2:  #2a445f;
-      --navy3:  #375373;
-      --orange: #D4620A;
-      --orange2:#F07830;
-      --teal:   #1D9E75;
-      --purple: #534AB7;
-      --pink:   #D4537E;
-      --white:  #F7F9FF;
-      --muted:  #8996B4;
-      --line:   rgba(255,255,255,0.14);
-      --radius: 10px;
+    /* ── Kopfbereich ── */
+    .kopf {
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--rand);
+      background:
+        linear-gradient(90deg, rgba(10,20,36,0.96) 0%, rgba(12,26,46,0.82) 45%, rgba(12,26,46,0.55) 100%);
     }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: Calibri, 'Segoe UI', system-ui, sans-serif;
-      background: var(--navy);
-      color: var(--white);
-      min-height: 100vh;
-      font-size: 15px;
-      line-height: 1.55;
+    .kopf-deko { position: absolute; inset: 0; pointer-events: none; }
+    .kopf-innen {
+      position: relative;
+      max-width: 1480px; margin: 0 auto;
+      padding: 18px 28px;
+      display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
     }
-
-    /* ── Header ── */
-    .header {
-      background: var(--navy2);
-      border-bottom: 1px solid var(--line);
-      padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+    .kopf-rechts { display: flex; align-items: center; gap: 18px; }
+    .kopf-trenner { width: 1px; height: 34px; background: var(--rand-stark); }
+    .nutzer { display: flex; align-items: center; gap: 10px; color: var(--text); }
+    .nutzer-bild {
+      width: 38px; height: 38px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--rand-stark); background: rgba(23,43,71,0.8); color: var(--text2);
     }
-    .header-brand {
-      font-family: 'Bahnschrift SemiBold', 'Segoe UI Semibold', sans-serif;
-      font-size: 18px;
-      color: var(--orange2);
-      letter-spacing: 0.03em;
+    .nutzer-rolle { font-weight: 600; font-size: 15px; line-height: 1.2; }
+    .nutzer-mail { font-size: 12px; color: var(--muted); line-height: 1.3; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nutzer-ab {
+      background: none; border: 1px solid transparent; color: var(--muted); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px; font-size: 13px; padding: 6px 8px; border-radius: 8px;
     }
-    .header-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .header-right { font-size: 12px; color: var(--muted); text-align: right; }
+    .nutzer-ab:hover { color: var(--text); border-color: var(--rand); }
+    .sp-modal { -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 
     /* ── Layout ── */
-    .main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+    .main { padding: 22px 28px 48px; max-width: 1480px; margin: 0 auto; }
 
-    /* ── Mannschaft-Tabs ── */
-    .tabs {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
+    /* ── Reiter (Mannschaften, Runde) ── */
+    .tabs { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
     .tab {
-      padding: 8px 18px;
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: var(--navy2);
-      color: var(--muted);
-      cursor: pointer;
-      font-family: Calibri, sans-serif;
-      font-size: 14px;
-      transition: all 160ms;
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 9px 22px; border-radius: 999px;
+      border: 1px solid var(--rand-stark);
+      background: rgba(18,35,59,0.72);
+      color: var(--text);
+      cursor: pointer; font-size: 16px; font-weight: 600;
+      transition: border-color 140ms, background 140ms;
     }
-    .tab:hover { border-color: var(--orange); color: var(--white); }
-    .tab.active { background: var(--orange); border-color: var(--orange); color: #fff; font-weight: 700; }
-
-    /* Turnier-Helfer-Tab: Pink, optisch abgesetzt von den Mannschaften */
-    .tab-turnier:hover { border-color: var(--pink); color: var(--white); }
-    .tab-turnier.active { background: var(--pink); border-color: var(--pink); color: #fff; font-weight: 700; }
-
-    /* ── Statistik-Leiste ── */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 24px;
+    .tab:hover { border-color: var(--orange); }
+    .tab .tab-liga { font-size: 13px; font-weight: 500; color: var(--muted); }
+    .tab.active {
+      background: linear-gradient(180deg, #ff8a2e, #e8670f);
+      border-color: #ff9440; color: #fff;
+      box-shadow: 0 4px 18px rgba(240,122,34,0.35);
     }
+    .tab.active .tab-liga { color: rgba(255,255,255,0.88); }
+    #tabs .tab { min-width: 0; }
+    #runde-umschalter { margin-bottom: 22px; }
+    #runde-umschalter .tab { padding: 8px 26px; font-size: 15px; }
+    #runde-umschalter .tab-aktion { padding: 8px 22px; }
+    #runde-umschalter select {
+      padding: 8px 16px; border-radius: 999px; border: 1px solid var(--rand-stark);
+      background: rgba(18,35,59,0.72); color: var(--text); font-size: 15px;
+    }
+    .tab-turnier.active { background: #c94a7a; border-color: #e0679a; box-shadow: none; }
+
+    /* ── Kennzahlen ── */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 26px; }
     .stat-card {
-      background: var(--navy2);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 14px 16px;
+      position: relative; overflow: hidden;
+      border-radius: 14px; padding: 18px 20px 16px 20px;
+      display: grid; grid-template-columns: auto 1fr; column-gap: 16px; align-items: start;
+      border: 1px solid; min-height: 104px;
     }
-    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
-    .stat-value { font-size: 26px; font-family: 'Bahnschrift SemiBold', sans-serif; color: var(--white); }
-    .stat-value.ok   { color: var(--teal); }
-    .stat-value.warn { color: #F0B429; }
-    .stat-value.crit { color: #E24B4A; }
+    .stat-card .stat-sym { width: 34px; height: 34px; margin-top: 2px; }
+    .stat-card .stat-bg { position: absolute; right: 14px; bottom: 10px; width: 64px; height: 64px; opacity: 0.16; }
+    .stat-label { font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text); margin-bottom: 0; }
+    .stat-value { font-family: var(--schrift-k); font-weight: 700; font-size: 44px; line-height: 1.05; }
+    .k-gesamt { background: linear-gradient(160deg, rgba(36,74,130,0.55), rgba(18,35,59,0.85)); border-color: rgba(90,162,255,0.45); }
+    .k-gesamt .stat-sym, .k-gesamt .stat-bg { color: #7fb6ff; }
+    .k-gesamt .stat-value { color: #fff; }
+    .k-offen  { background: linear-gradient(160deg, rgba(110,80,20,0.45), rgba(18,35,59,0.85)); border-color: rgba(245,184,61,0.55); }
+    .k-offen .stat-sym, .k-offen .stat-bg { color: var(--gelb); }
+    .k-krit   { background: linear-gradient(160deg, rgba(150,30,36,0.55), rgba(40,22,40,0.85)); border-color: rgba(255,90,82,0.65); box-shadow: 0 0 24px rgba(255,90,82,0.18); }
+    .k-krit .stat-sym, .k-krit .stat-bg { color: var(--rot); }
+    .k-ok     { background: linear-gradient(160deg, rgba(16,110,80,0.50), rgba(18,35,59,0.85)); border-color: rgba(47,207,143,0.60); }
+    .k-ok .stat-sym, .k-ok .stat-bg { color: var(--gruen); }
+    .stat-value.ok   { color: var(--gruen); }
+    .stat-value.warn { color: var(--gelb); }
+    .stat-value.crit { color: var(--rot); }
+
+    /* ── Abschnittskopf ── */
+    .abschnitt { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .abschnitt-titel { display: flex; align-items: center; gap: 12px; color: var(--text2); }
+    .section-title { font-family: var(--schrift-k); font-weight: 700; font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); }
+    .abschnitt-meta { color: var(--text2); font-size: 15px; }
 
     /* ── Spielplan-Tabelle ── */
-    .section-title {
-      font-family: 'Bahnschrift SemiBold', 'Segoe UI Semibold', sans-serif;
-      font-size: 15px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 10px;
+    .tabellen-rahmen {
+      border: 1px solid var(--rand);
+      border-radius: 14px;
+      background: rgba(14,27,48,0.72);
+      box-shadow: var(--schatten);
     }
-    .spielplan-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
+    .table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 14px; }
+    .spielplan-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; }
+    .spielplan-table thead th {
+      padding: 12px 14px; text-align: left; font-size: 13px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em; color: var(--text2);
+      background: rgba(23,43,71,0.75); border-bottom: 1px solid var(--rand); white-space: nowrap;
     }
-    .spielplan-table thead tr {
-      background: var(--navy3);
-      border-bottom: 1px solid var(--line);
-    }
-    .spielplan-table th {
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      font-weight: 700;
-    }
-    .spielplan-table td {
-      padding: 11px 14px;
-      border-bottom: 1px solid var(--line);
-      vertical-align: middle;
-    }
-    .spielplan-table tbody tr { background: var(--navy2); transition: background 120ms; }
-    .spielplan-table tbody tr:hover { background: var(--navy3); }
+    .spielplan-table td { padding: 9px 14px; border-bottom: 1px solid rgba(120,160,220,0.10); vertical-align: middle; }
+    .spielplan-table tbody tr:last-child td { border-bottom: none; }
+    .spielplan-table tbody tr { transition: background 120ms; }
+    .spielplan-table tbody tr:hover { background: rgba(29,52,86,0.45); }
 
-    /* Ampel-Badge */
-    .ampel {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .ampel-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .ampel.ok   { background: rgba(29,158,117,0.15); color: #4FD4A8; }
-    .ampel.ok   .ampel-dot { background: #1D9E75; }
-    .ampel.warn { background: rgba(240,180,41,0.15); color: #F0C060; }
-    .ampel.warn .ampel-dot { background: #F0B429; }
-    .ampel.crit { background: rgba(226,75,74,0.15); color: #F08080; }
-    .ampel.crit .ampel-dot { background: #E24B4A; }
-    .ampel.offen { background: rgba(137,150,180,0.12); color: var(--muted); }
-    .ampel.offen .ampel-dot { background: var(--muted); }
+    .zelle-datum { display: flex; align-items: center; gap: 14px; min-width: 175px; }
+    .zelle-datum > .sym { color: var(--text2); width: 22px; height: 22px; }
+    .datum-main { font-weight: 600; font-size: 16px; color: var(--text); line-height: 1.25; white-space: nowrap; }
+    .datum-sub  { font-size: 13.5px; color: var(--text2); display: flex; align-items: center; gap: 5px; line-height: 1.3; }
+    .datum-sub .sym { width: 13px; height: 13px; }
+    .datum-status { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--gelb); margin-left: 4px; }
+    .datum-status.noetig { color: var(--orange2); }
+    .datum-alt { font-size: 12.5px; color: var(--orange2); font-weight: 600; white-space: nowrap; }
+    .datum-alt-alt { color: var(--muted); text-decoration: line-through; }
 
-    /* H/A Badge */
-    .ha-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-    .ha-h { background: rgba(83,74,183,0.20); color: #9D96E8; }
-    .ha-a { background: rgba(212,98,10,0.20); color: var(--orange2); }
+    .zelle-gegner { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 16px; }
+    .zelle-gegner > .sym { width: 24px; height: 24px; color: var(--text2); }
+    .gegner-name { white-space: nowrap; }
+    .zelle-gegner .pill-auf { margin-left: auto; }
 
-    /* Datum-Block */
-    .datum-block { line-height: 1.2; }
-    .datum-main { font-weight: 700; color: var(--white); }
-    .datum-sub  { font-size: 12px; color: var(--muted); }
+    .badges { display: flex; gap: 6px; flex-wrap: nowrap; }
+    .alt-box { margin-top: 6px; background: rgba(240,122,34,0.08); border: 1px solid rgba(240,122,34,0.22); border-radius: 8px; padding: 4px 8px; }
+    .alt-box-titel { font-size: 11px; color: var(--orange2); font-weight: 700; margin-bottom: 3px; }
 
-    /* Link-Button */
-    .btn-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--line);
-      background: transparent;
-      color: var(--muted);
-      font-size: 12px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 140ms;
-    }
-    .btn-link:hover { border-color: var(--teal); color: var(--teal); }
-    .btn-link svg { width: 13px; height: 13px; }
+    .rm-knopf { background: none; border: none; cursor: pointer; text-align: left; padding: 0; color: inherit; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+    .rm-zahl { font-size: 16px; font-weight: 700; color: var(--text); line-height: 1.2; }
+    .rm-zahl.voll { color: var(--gruen); }
+    .rm-leer { font-size: 13px; color: var(--muted); }
+    .rm-alt { margin-bottom: 5px; cursor: pointer; }
+    .rm-alt-titel { font-size: 11px; color: var(--muted); }
 
-    /* Abfrage-Button */
-    .btn-abfrage {
-      display: inline-block;
-      padding: 5px 12px;
-      border-radius: 6px;
-      background: #D4A017;
-      color: #1a1000;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      border: none;
-      text-decoration: none;
-      transition: opacity 140ms;
+    .aktionen { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; }
+    .ak {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 42px; height: 34px; border-radius: 9px; border: 1px solid transparent;
+      cursor: pointer; padding: 0; text-decoration: none;
+      transition: filter 120ms, background 120ms, border-color 120ms;
     }
-    .btn-abfrage:hover { opacity: 0.85; }
+    .ak .sym { width: 19px; height: 19px; }
+    .ak:hover { filter: brightness(1.12); }
+    .ak-link { background: rgba(245,184,61,0.08); border-color: rgba(245,184,61,0.65); color: var(--gelb); }
+    .ak-wa   { background: var(--wa); color: #fff; }
+    .ak-alt  { background: linear-gradient(180deg, #ff8a2e, #e8670f); color: #fff; }
+    .ak-auf  { background: rgba(23,43,71,0.9); border-color: rgba(90,162,255,0.45); color: #dbe7ff; }
+    .ak.kopiert { background: #128c45; }
+    .ak-verlegung {
+      display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+      padding: 6px 14px; border-radius: 9px; cursor: pointer;
+      background: rgba(255,90,82,0.18); border: 1px solid rgba(255,90,82,0.70); color: #ffd9d6;
+      font-size: 14px; font-weight: 600; margin-right: 6px;
+    }
+    .ak-verlegung .sym { color: var(--rot); width: 17px; height: 17px; }
+    .ak-verlegung:hover { background: rgba(255,90,82,0.28); }
 
-    .btn-wa {
-      display: inline-block;
-      padding: 5px 10px;
-      border-radius: 6px;
-      background: #25D366;
-      border: 1px solid #1aad54;
-      color: #fff;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 140ms;
-      font-family: Calibri, sans-serif;
+    /* Kritische Termine sofort erkennbar */
+    .spielplan-table tbody tr.zeile-kritisch td {
+      background: rgba(140,28,36,0.40);
+      border-top: 1px solid rgba(255,90,82,0.75);
+      border-bottom: 1px solid rgba(255,90,82,0.75);
     }
-    .btn-wa:hover { background: #1aad54; }
-    .btn-wa.kopiert { background: #128C45; color: #fff; }
+    .spielplan-table tbody tr.zeile-kritisch td:first-child { border-left: 3px solid var(--rot); border-radius: 10px 0 0 10px; }
+    .spielplan-table tbody tr.zeile-kritisch td:last-child  { border-right: 1px solid rgba(255,90,82,0.75); border-radius: 0 10px 10px 0; }
+    .spielplan-table tbody tr.zeile-offen-verlegung { opacity: 0.5; }
 
-    .btn-detail {
-      display: inline-block;
-      padding: 5px 10px;
-      border-radius: 6px;
-      background: rgba(180,180,190,0.15);
-      border: 1px solid rgba(180,180,190,0.35);
-      color: #B4B2A9;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 140ms;
-      font-family: Calibri, sans-serif;
-    }
-    .btn-detail:hover { background: rgba(180,180,190,0.28); color: #fff; }
+    /* Bestehende Klassen anderer Ansichten (Helfer, Modale) */
+    .ha-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .ha-h { background: rgba(143,134,255,0.18); color: #b9b3ff; }
+    .ha-a { background: rgba(240,122,34,0.16); color: var(--orange2); }
+    .datum-block { line-height: 1.25; }
+    .btn-abfrage { display: inline-block; padding: 6px 14px; border-radius: 8px; background: var(--gelb); color: #1a1000; font-size: 13px; font-weight: 700; cursor: pointer; border: none; text-decoration: none; }
+    .btn-wa { display: inline-block; padding: 6px 12px; border-radius: 8px; background: var(--wa); border: none; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .btn-wa.kopiert { background: #128c45; }
 
-    .btn-verschiebung {
-      display: inline-block;
-      padding: 5px 10px;
-      border-radius: 6px;
-      background: rgba(212,98,10,0.15);
-      border: 1px solid rgba(212,98,10,0.40);
-      color: #F07830;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 140ms;
-      font-family: Calibri, sans-serif;
-    }
-    .btn-verschiebung:hover { background: rgba(212,98,10,0.28); }
-    .btn-verschiebung.aktiv { background: rgba(212,98,10,0.35); color: #fff; }
-    /* ── Loading / Error ── */
-    .loading {
-      text-align: center;
-      padding: 60px 24px;
-      color: var(--muted);
-    }
-    .loading-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--orange);
-      animation: pulse 1.2s ease-in-out infinite;
-      margin: 0 3px;
-    }
+    /* ── Laden / Fehler ── */
+    .loading { text-align: center; padding: 60px 24px; color: var(--muted); }
+    .loading-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); animation: pulse 1.2s ease-in-out infinite; margin: 0 3px; }
     .loading-dot:nth-child(2) { animation-delay: 0.2s; }
     .loading-dot:nth-child(3) { animation-delay: 0.4s; }
     @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+    .config-hint { background: rgba(240,122,34,0.10); border: 1px solid rgba(240,122,34,0.3); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 24px; font-size: 14px; line-height: 1.7; }
+    .config-hint code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; }
 
-    .config-hint {
-      background: rgba(212,98,10,0.12);
-      border: 1px solid rgba(212,98,10,0.3);
-      border-radius: var(--radius);
-      padding: 20px 24px;
-      margin-bottom: 24px;
-      font-size: 14px;
-      line-height: 1.7;
-    }
-    .config-hint code {
-      background: rgba(255,255,255,0.08);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 13px;
-    }
+    /* ── Detailansicht (Rückmeldungen) ── */
+    .dt { background: linear-gradient(180deg, #13243d, #0f1c31); border: 1px solid var(--rand-stark); border-radius: 18px; max-width: 560px; width: 100%; max-height: 88vh; overflow-y: auto; box-shadow: 0 24px 60px rgba(0,0,0,0.55); }
+    .dt-kopf { position: sticky; top: 0; z-index: 1; background: linear-gradient(180deg, #172b47, #13243d); padding: 18px 22px 16px; border-bottom: 1px solid var(--rand); display: flex; gap: 14px; align-items: flex-start; }
+    .dt-kopf > .sym { width: 30px; height: 30px; color: var(--text2); margin-top: 4px; }
+    .dt-kicker { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+    .dt-titel { font-family: var(--schrift-k); font-weight: 700; font-size: 22px; line-height: 1.2; color: var(--text); margin-top: 4px; }
+    .dt-meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--text2); font-size: 14px; margin-top: 6px; }
+    .dt-meta span { display: inline-flex; align-items: center; gap: 6px; }
+    .dt-meta .sym { width: 15px; height: 15px; }
+    .dt-zu { margin-left: auto; background: none; border: 1px solid var(--rand); border-radius: 9px; color: var(--text2); cursor: pointer; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .dt-zu:hover { color: var(--text); border-color: var(--rand-stark); }
+    .dt-inhalt { padding: 18px 22px 22px; }
+    .dt-lage { display: flex; gap: 12px; align-items: center; border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; border: 1px solid; }
+    .dt-lage .sym { width: 24px; height: 24px; }
+    .dt-lage-titel { font-weight: 700; font-size: 15px; }
+    .dt-lage-text { font-size: 13.5px; color: var(--text2); }
+    .dt-lage.crit { background: rgba(160,28,34,0.30); border-color: rgba(255,90,82,0.65); }
+    .dt-lage.crit .sym, .dt-lage.crit .dt-lage-titel { color: #ff8a84; }
+    .dt-lage.warn { background: rgba(140,100,20,0.28); border-color: rgba(245,184,61,0.55); }
+    .dt-lage.warn .sym, .dt-lage.warn .dt-lage-titel { color: var(--gelb); }
+    .dt-lage.ok { background: rgba(16,110,80,0.25); border-color: rgba(47,207,143,0.55); }
+    .dt-lage.ok .sym, .dt-lage.ok .dt-lage-titel { color: var(--gruen); }
+    .dt-lage.offen { background: rgba(23,43,71,0.6); border-color: var(--rand-stark); }
+    .dt-lage .knopf { margin-left: auto; }
+    .dt-zahlen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+    .dt-zahl { background: rgba(23,43,71,0.6); border: 1px solid var(--rand); border-radius: 10px; padding: 8px 10px; text-align: center; }
+    .dt-zahl b { display: block; font-family: var(--schrift-k); font-size: 26px; line-height: 1.1; }
+    .dt-zahl span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .dt-zahl.ja b { color: var(--gruen); } .dt-zahl.viel b { color: var(--gelb); } .dt-zahl.nein b { color: var(--rot); } .dt-zahl.offen b { color: var(--text2); }
+    .dt-gruppe { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text2); margin: 4px 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .dt-gruppe.fehlt { color: #ff8a84; }
+    .rm-zeile { display: flex; align-items: flex-start; gap: 12px; padding: 9px 12px; background: rgba(23,43,71,0.55); border: 1px solid rgba(120,160,220,0.10); border-radius: 10px; margin-bottom: 6px; }
+    .rm-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: rgba(90,162,255,0.16); color: #bcd7ff; }
+    .rm-text { flex: 1; min-width: 0; }
+    .rm-kopf { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
+    .rm-name { font-size: 15px; font-weight: 500; color: var(--text); }
+    .rm-notiz { font-size: 13px; color: var(--text2); margin-top: 1px; padding-left: 10px; border-left: 2px solid rgba(240,122,34,0.55); white-space: pre-wrap; word-break: break-word; }
+    .rm-keine { font-size: 12px; color: #ff8a84; font-weight: 600; }
+    .dt-trenner { height: 1px; background: var(--rand); margin: 14px 0; }
+    .dt-alle { font-size: 14px; color: var(--gruen); padding: 6px 0 10px; display: flex; gap: 8px; align-items: center; }
 
-    /* Breite Tabellen auf Smartphones horizontal scrollbar statt abgeschnitten */
-    .table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-    @media (max-width: 680px) {
-      .main { padding: 16px 12px; }
-      .spielplan-table td, .spielplan-table th { padding: 9px 8px; }
+    @media (max-width: 1100px) {
       .stats { grid-template-columns: repeat(2, 1fr); }
-      .header { flex-direction: column; align-items: flex-start; }
-      .spielplan-table th:nth-child(5),
-      .spielplan-table td:nth-child(5) { display: none; }
+    }
+    @media (max-width: 680px) {
+      .kopf-innen { padding: 14px 14px; }
+      .marke-titel { font-size: 20px; }
+      .marke-logo { width: 38px; height: 38px; }
+      .kopf-trenner, .nutzer-mail, .nutzer-ab-text { display: none; }
+      .kopf-rechts { width: 100%; justify-content: space-between; gap: 10px; }
+      .knopf-rahmen { padding: 7px 14px; font-size: 14px; }
+      .nutzer-bild { width: 32px; height: 32px; }
+      .nutzer-rolle { font-size: 14px; }
+      .main { padding: 16px 12px 40px; }
+      .tab { padding: 8px 14px; font-size: 14px; }
+      .stats { gap: 10px; }
+      .stat-card { padding: 12px 14px; min-height: 0; column-gap: 10px; }
+      .stat-card .stat-sym { width: 24px; height: 24px; }
+      .stat-card .stat-bg { display: none; }
+      .stat-label { font-size: 11.5px; }
+      .stat-value { font-size: 30px; }
+      .section-title { font-size: 19px; }
+      .spielplan-table td, .spielplan-table th { padding: 8px 8px; }
+      .spielplan-table th:nth-child(5), .spielplan-table td:nth-child(5) { display: none; }
+      .dt-zahlen { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
 
-<header class="header">
-  <div>
-    <div class="header-brand">Spielplan-App · FC Strass e.V.</div>
-    <div class="header-sub">Verfügbarkeiten Saison 2026/27</div>
-  </div>
-  <div class="header-right" style="display:flex;align-items:center;gap:12px">
-    <button id="btn-export" onclick="zeigeExportMenu()" style="padding:7px 16px;border-radius:6px;background:#D4620A;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif;transition:all 140ms;display:inline-flex;align-items:center;gap:6px" onmouseover="this.style.background='#E87722'" onmouseout="this.style.background='#D4620A'">⬇ Export</button>
-    <div id="header-status">Verbinde...</div>
+<header class="kopf">
+  <svg class="kopf-deko" viewBox="0 0 1600 110" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+    <defs>
+      <pattern id="netz" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M9 0H0V9" fill="none" stroke="#9fb6d8" stroke-opacity=".16" stroke-width="1"/></pattern>
+      <linearGradient id="netz-blende" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".35" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity=".25"/></linearGradient>
+      <mask id="netz-maske"><rect x="640" y="0" width="760" height="110" fill="url(#netz-blende)"/></mask>
+      <linearGradient id="streif" x1="0" x2="1"><stop offset="0" stop-color="#f07a22" stop-opacity="0"/><stop offset=".5" stop-color="#ff8a2e" stop-opacity=".85"/><stop offset="1" stop-color="#f07a22" stop-opacity="0"/></linearGradient>
+    </defs>
+    <g mask="url(#netz-maske)">
+      <polygon points="700,0 1400,0 1400,46 700,78" fill="url(#netz)"/>
+      <line x1="700" y1="0" x2="1400" y2="0" stroke="#dfe8f6" stroke-opacity=".35" stroke-width="3"/>
+    </g>
+    <polygon points="1580,0 1600,0 1600,40 1540,110 1515,110" fill="url(#streif)" opacity=".55"/>
+  </svg>
+  <div class="kopf-innen">
+    <div class="marke">
+      <span id="marke-logo"></span>
+      <div>
+        <div class="marke-titel">Spielplan-App · <em>FC Strass e.V.</em></div>
+        <div class="marke-sub">Verfügbarkeiten Saison 2026/27</div>
+      </div>
+    </div>
+    <div class="kopf-rechts">
+      <button id="btn-export" class="knopf knopf-rahmen" onclick="zeigeExportMenu()">Export <span id="export-sym"></span></button>
+      <span class="kopf-trenner" aria-hidden="true"></span>
+      <div id="header-status" class="nutzer">Verbinde...</div>
+    </div>
   </div>
 </header>
 
@@ -329,14 +317,17 @@
 
   <!-- Statistik-Leiste -->
   <div class="stats" id="stats">
-    <div class="stat-card"><div class="stat-label">Spieltage gesamt</div><div class="stat-value" id="stat-gesamt">–</div></div>
-    <div class="stat-card"><div class="stat-label">Abfragen offen</div><div class="stat-value warn" id="stat-offen">–</div></div>
-    <div class="stat-card"><div class="stat-label" for-stat="krit">Zu wenig (&lt;6 Zusagen)</div><div class="stat-value crit" id="stat-krit">–</div></div>
-    <div class="stat-card"><div class="stat-label" for-stat="ok">Spielbereit (≥6 Ja)</div><div class="stat-value ok" id="stat-ok">–</div></div>
+    <div class="stat-card k-gesamt"><span data-sym="kalender" class="stat-sym"></span><div><div class="stat-label">Spieltage gesamt</div><div class="stat-value" id="stat-gesamt">–</div></div><span data-sym="kalender" class="stat-bg"></span></div>
+    <div class="stat-card k-offen"><span data-sym="liste" class="stat-sym"></span><div><div class="stat-label">Abfragen offen</div><div class="stat-value warn" id="stat-offen">–</div></div><span data-sym="haken" class="stat-bg"></span></div>
+    <div class="stat-card k-krit"><span data-sym="warnung" class="stat-sym"></span><div><div class="stat-label" for-stat="krit">Zu wenig (&lt;6 Zusagen)</div><div class="stat-value crit" id="stat-krit">–</div></div><span data-sym="warnung" class="stat-bg"></span></div>
+    <div class="stat-card k-ok"><span data-sym="team" class="stat-sym"></span><div><div class="stat-label" for-stat="ok">Spielbereit (≥6 Ja)</div><div class="stat-value ok" id="stat-ok">–</div></div><span data-sym="team" class="stat-bg"></span></div>
   </div>
 
   <!-- Spielplan -->
-  <div class="section-title" id="section-title">Spielplan</div>
+  <div class="abschnitt">
+    <div class="abschnitt-titel"><span data-sym="kalender" class="sym-l"></span><div class="section-title" id="section-title">Spielplan</div></div>
+    <div class="abschnitt-meta" id="section-meta"></div>
+  </div>
   <div id="table-container">
     <div class="loading">
       <span class="loading-dot"></span>
@@ -349,6 +340,7 @@
 </main>
 
 <script src="js/config.js"></script>
+<script src="js/symbole.js"></script>
 <script src="js/sicherheit.js"></script>
 <script src="js/texte.js"></script>
 <script src="js/rueckrunde.js"></script>

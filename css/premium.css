@@ -1,0 +1,139 @@
+/* ============================================================================
+   Spielplan-App 2.0 · Premium-Gestaltung (gemeinsame Grundlagen)
+   Dunkles Navy, Orange als Akzent, Schrift Barlow (selbst gehostet, OFL).
+   Keine externen Ressourcen, keine Animationen außer dezenten Übergängen.
+   ============================================================================ */
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 400; font-display: swap; src: url('../fonts/barlow-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 500; font-display: swap; src: url('../fonts/barlow-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 600; font-display: swap; src: url('../fonts/barlow-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 700; font-display: swap; src: url('../fonts/barlow-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Semi Condensed'; font-style: normal; font-weight: 600; font-display: swap; src: url('../fonts/barlow-semi-condensed-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Semi Condensed'; font-style: normal; font-weight: 700; font-display: swap; src: url('../fonts/barlow-semi-condensed-latin-700-normal.woff2') format('woff2'); }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Grundfarben */
+  --bg:        #0a1424;
+  --bg2:       #0e1b30;
+  --flaeche:   #12233b;
+  --flaeche2:  #172b47;
+  --flaeche3:  #1d3456;
+  --rand:      rgba(120,160,220,0.16);
+  --rand-stark:rgba(120,160,220,0.30);
+  --text:      #f3f6fc;
+  --text2:     #c4cee0;
+  --muted:     #8798b6;
+
+  /* Akzent */
+  --orange:    #f07a22;
+  --orange2:   #ff9440;
+  --orange-d:  #d4620a;
+
+  /* Status */
+  --gruen:     #2fcf8f;
+  --gruen-bg:  rgba(47,207,143,0.12);
+  --gelb:      #f5b83d;
+  --gelb-bg:   rgba(245,184,61,0.12);
+  --rot:       #ff5a52;
+  --rot-bg:    rgba(255,90,82,0.12);
+  --blau:      #5aa2ff;
+  --violett:   #8f86ff;
+  --wa:        #25d366;
+
+  /* Kompatibilität mit bestehenden Inline-Stilen */
+  --navy: var(--bg2); --navy2: var(--flaeche); --navy3: var(--flaeche2);
+  --white: var(--text); --line: var(--rand); --teal: #1d9e75;
+
+  --radius:    12px;
+  --radius-s:  8px;
+  --schatten:  0 10px 30px rgba(0,0,0,0.35);
+  --schrift:   'Barlow', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --schrift-k: 'Barlow Semi Condensed', 'Barlow', 'Segoe UI', system-ui, sans-serif;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--schrift);
+  color: var(--text);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(900px 420px at 92% -8%, rgba(240,122,34,0.16), transparent 62%),
+    radial-gradient(800px 600px at -12% 18%, rgba(46,96,170,0.28), transparent 60%),
+    radial-gradient(1000px 700px at 50% 120%, rgba(30,70,130,0.25), transparent 60%),
+    linear-gradient(180deg, #0c1a2e 0%, #091322 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--orange2); outline-offset: 2px; }
+
+/* ── Symbole ── */
+.sym { width: 18px; height: 18px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+.sym-s { width: 14px; height: 14px; }
+.sym-l { width: 26px; height: 26px; }
+
+/* ── Marke (Schläger + Ball, reine Tischtennis-Bildsprache) ── */
+.marke { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.marke-logo { width: 46px; height: 46px; flex-shrink: 0; }
+.marke-titel {
+  font-family: var(--schrift-k);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+.marke-titel em { font-style: normal; color: var(--orange); }
+.marke-sub { font-size: 14px; color: var(--text2); margin-top: 2px; }
+
+/* ── Pillen / Badges ── */
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; line-height: 1.6; white-space: nowrap;
+}
+.pill-punkt { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.pill-ja    { background: #e3f7ee; color: #0b5a3d; }
+.pill-ja .pill-punkt { background: #1aa56f; }
+.pill-viel  { background: #fcf0d6; color: #6a4300; }
+.pill-viel .pill-punkt { background: #eda21c; }
+.pill-nein  { background: #fde7e6; color: #8a1d1a; }
+.pill-nein .pill-punkt { background: #e2453f; }
+.pill-k { padding: 1px 7px; font-size: 11px; }
+.pill-k .pill-punkt { width: 5px; height: 5px; }
+
+.pill-heim  { background: rgba(143,134,255,0.18); color: #b9b3ff; border: 1px solid rgba(143,134,255,0.28); }
+.pill-ausw  { background: rgba(240,122,34,0.16); color: var(--orange2); border: 1px solid rgba(240,122,34,0.30); }
+.pill-auf   { background: rgba(47,207,143,0.14); color: var(--gruen); border: 1px solid rgba(47,207,143,0.30); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 8px; }
+.pill-fehlen{ background: rgba(255,90,82,0.16); color: #ff8a84; font-size: 11.5px; padding: 0 8px; }
+.pill-alle  { background: var(--gruen-bg); color: var(--gruen); font-size: 11.5px; padding: 0 8px; }
+.pill-offen { background: rgba(135,152,182,0.14); color: var(--muted); font-size: 11.5px; padding: 0 8px; }
+
+/* ── Schaltflächen ── */
+.knopf {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 18px; border-radius: 999px;
+  border: 1px solid var(--rand-stark); background: rgba(18,35,59,0.7);
+  color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: border-color 140ms, background 140ms, color 140ms;
+  text-decoration: none; white-space: nowrap;
+}
+.knopf:hover { border-color: var(--orange); }
+.knopf-akzent { background: linear-gradient(180deg, #ff8a2e, #e8670f); border-color: #ff9440; color: #fff; box-shadow: 0 4px 18px rgba(240,122,34,0.35); }
+.knopf-akzent:hover { background: linear-gradient(180deg, #ff9640, #f07322); }
+.knopf-rahmen { border-color: var(--orange); color: var(--text); background: rgba(240,122,34,0.06); }
+.knopf-wa { background: var(--wa); border-color: var(--wa); color: #fff; }
+.knopf-wa:hover { background: #1fbd5a; border-color: #1fbd5a; }
+.knopf-wa.kopiert { background: #128c45; }
+.knopf-gefahr { background: rgba(255,90,82,0.14); border-color: rgba(255,90,82,0.55); color: #ff8a84; }
+.knopf-gefahr:hover { background: rgba(255,90,82,0.24); border-color: var(--rot); }
+.knopf-klein { padding: 6px 12px; font-size: 13px; gap: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
