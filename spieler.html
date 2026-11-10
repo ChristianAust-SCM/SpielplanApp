@@ -4,7 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Verfügbarkeit melden · FC Strass</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="js/config.js"></script>
+  <script src="js/sicherheit.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -89,6 +93,9 @@
     .error-msg { background:rgba(226,75,74,0.12); border:1px solid rgba(226,75,74,0.3); border-radius:8px; padding:12px 14px; font-size:13px; color:#F08080; margin-top:12px; }
     .footer-hint { font-size:12px; color:var(--muted); text-align:center; margin-top:20px; line-height:1.5; }
     .hidden { display:none !important; }
+    .antwort-btn { min-height:48px; }
+    .spieler-select, .freitext-input, .anmerkung { font-size:16px; } /* verhindert iOS-Zoom */
+    .spieler-select:disabled { opacity:1; cursor:default; }
   </style>
 </head>
 <body>
@@ -114,217 +121,189 @@
 </div>
 
 <script>
-const SUPABASE_URL  = 'https://nwutgxjnverlvmkrpiep.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_09tn0DY3wswcIVQ-mN1S8A_znKWQXaF';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-
-let gewaehlteAntwort = null;
-let terminId = null;
-let mannschaftId = null;
-let nichtKaderModus = false;
-
-function vorname(dbName) {
-  const parts = dbName.split(',');
-  return parts.length === 2 ? parts[1].trim() + ' ' + parts[0].trim() : dbName;
-}
-
-async function laden() {
-  const params   = new URLSearchParams(window.location.search);
-  const token    = params.get('token');
-  const altToken = params.get('alt');
-
-  if (!token && !altToken) { zeigeError('Ungültiger Link – kein Token gefunden.'); return; }
-
-  let termin, altTerminId = null;
-
-  if (altToken) {
-    // Alternativtermin-Link
-    const res = await sb.from('alternativtermine')
-      .select('*, spieltermine(id, gegner, heim, mannschaften(id, name, liga))')
-      .eq('abfrage_token', altToken)
-      .single();
-
-    if (res.error || !res.data) {
-      zeigeError('Alternativtermin nicht gefunden. Bitte neuen Link beim Mannschaftsführer anfordern.');
-      return;
-    }
-
-    const alt = res.data;
-    altTerminId  = alt.id;
-    terminId     = alt.spieltermine.id;
-    mannschaftId = alt.spieltermine.mannschaften.id;
-
-    const d   = new Date(alt.datum);
-    const dt  = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
-    const uhr = alt.uhrzeit ? alt.uhrzeit.slice(0,5) + ' Uhr' : '';
-
-    document.getElementById('spiel-titel').textContent =
-      '📅 Ausweichtermin: ' + (alt.spieltermine.heim ? 'Heimspiel' : 'Auswärtsspiel') + ' gegen ' + alt.spieltermine.gegner;
-    document.getElementById('spiel-meta').innerHTML =
-      alt.spieltermine.mannschaften.name + ' &middot; ' + alt.spieltermine.mannschaften.liga +
-      '<br>' + dt + (uhr ? ' &middot; ' + uhr : '') +
-      '<br><span style="color:#F07830;font-weight:700">Bitte abstimmen ob ihr an diesem Ausweichtermin spielen könnt</span>';
-
-  } else {
-    // Normaler Spieltermin-Link
-    const res = await sb.from('spieltermine')
-      .select('*, mannschaften(id, name, liga)')
-      .eq('abfrage_token', token)
-      .single();
-
-    if (res.error || !res.data) {
-      zeigeError('Spieltermin nicht gefunden. Bitte neuen Link beim Mannschaftsführer anfordern.');
-      return;
-    }
-
-    termin       = res.data;
-    terminId     = termin.id;
-    mannschaftId = termin.mannschaften.id;
-
-    const d   = new Date(termin.datum);
-    const dt  = d.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
-    const uhr = termin.uhrzeit ? termin.uhrzeit.slice(0,5) + ' Uhr' : '';
-
-    document.getElementById('spiel-titel').textContent =
-      (termin.heim ? 'Heimspiel' : 'Auswärtsspiel') + ' gegen ' + termin.gegner;
-    document.getElementById('spiel-meta').innerHTML =
-      termin.mannschaften.name + ' &middot; ' + termin.mannschaften.liga +
-      '<br>' + dt + (uhr ? ' &middot; ' + uhr : '');
-  }
-
-  // Spieler laden
-  const sp = await sb.from('spieler')
-    .select('id, name')
-    .eq('mannschaft_id', mannschaftId)
-    .eq('aktiv', true)
-    .order('name');
-
-  // altTerminId global setzen für abschicken()
-  window._altTerminId = altTerminId;
-  renderFormular(sp.data || []);
-}
-
-function renderFormular(spieler) {
-  const optionen = spieler.map(function(s) {
-    return '<option value="' + s.id + '">' + vorname(s.name) + '</option>';
-  }).join('');
-
-  document.getElementById('card-body').innerHTML =
-    '<div class="field">' +
-      '<label>Dein Name</label>' +
-      '<select class="spieler-select" id="spieler-select" onchange="pruefeFormular()">' +
-        '<option value="">– bitte auswählen –</option>' +
-        optionen +
-      '</select>' +
-      '<div class="nicht-kader" onclick="toggleFreitext()">Ich stehe nicht in der Liste</div>' +
-    '</div>' +
-    '<div class="field hidden" id="freitext-feld">' +
-      '<label>Name eingeben</label>' +
-      '<input type="text" class="freitext-input" id="freitext" placeholder="Name eingeben" oninput="pruefeFormular()">' +
-    '</div>' +
-    '<div class="field">' +
-      '<label>Kannst du spielen?</label>' +
-      '<div class="antwort-gruppe">' +
-        '<button class="antwort-btn" data-val="Ja"      onclick="waehleAntwort(this,\'sel-ja\')">Ja</button>' +
-        '<button class="antwort-btn" data-val="Vielleicht" onclick="waehleAntwort(this,\'sel-bedingt\')">Vielleicht</button>' +
-        '<button class="antwort-btn" data-val="Nein"    onclick="waehleAntwort(this,\'sel-nein\')">Nein</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="field">' +
-      '<label>Anmerkung (optional)</label>' +
-      '<textarea class="anmerkung" id="anmerkung" placeholder="z.B. Kann erst ab 15 Uhr..."></textarea>' +
-    '</div>' +
-    '<button class="btn-submit" id="btn-senden" onclick="abschicken()" disabled>Rückmeldung absenden</button>' +
-    '<div id="error-box"></div>';
-}
-
-function toggleFreitext() {
-  nichtKaderModus = !nichtKaderModus;
-  document.getElementById('freitext-feld').classList.toggle('hidden', !nichtKaderModus);
-  document.getElementById('spieler-select').classList.toggle('hidden', nichtKaderModus);
-  document.querySelector('.nicht-kader').textContent =
-    nichtKaderModus ? '← Zurück zur Auswahlliste' : 'Ich stehe nicht in der Liste';
-  pruefeFormular();
-}
-
-function waehleAntwort(btn, cls) {
-  document.querySelectorAll('.antwort-btn').forEach(function(b) {
-    b.classList.remove('sel-ja','sel-nein','sel-bedingt');
+// ============================================================
+// Verfügbarkeitsabfrage ohne Login
+// ------------------------------------------------------------
+// Alle Datenzugriffe laufen über token-geprüfte Serverfunktionen
+// (abfrage_laden / abfrage_antworten / abfrage_nachmelden).
+// Das Token bleibt nur im Speicher dieser Seite: kein Browser-Speicher,
+// keine Session, keine Konsolenausgabe, Versand per POST (nicht in URLs).
+// ============================================================
+(function () {
+  'use strict';
+  var esc = SPS.esc;
+  var sb = window.supabase.createClient(APP_CONFIG.SUPABASE_URL, APP_CONFIG.SUPABASE_ANON, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
-  btn.classList.add(cls);
-  gewaehlteAntwort = btn.dataset.val;
-  pruefeFormular();
-}
 
-function pruefeFormular() {
-  var nameOk = nichtKaderModus
-    ? (document.getElementById('freitext') && document.getElementById('freitext').value.trim().length > 2)
-    : (document.getElementById('spieler-select') && document.getElementById('spieler-select').value !== '');
-  var btn = document.getElementById('btn-senden');
-  if (btn) btn.disabled = !(nameOk && gewaehlteAntwort);
-}
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('token') || params.get('alt') || '';
+  var daten = null;
+  var gewaehlteAntwort = null;
+  var nichtKaderModus = false;
 
-async function abschicken() {
-  var btn = document.getElementById('btn-senden');
-  btn.disabled = true;
-  btn.textContent = 'Wird gespeichert...';
-  document.getElementById('error-box').innerHTML = '';
+  function datumText(iso, uhrzeit) {
+    var d = SPS.lokalesDatum(iso);
+    var dt = d ? d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';
+    return dt + (uhrzeit ? ' · ' + String(uhrzeit).slice(0, 5) + ' Uhr' : '');
+  }
 
-  var anmerkung = (document.getElementById('anmerkung') && document.getElementById('anmerkung').value.trim()) || '';
-  var spielerId = null;
-  var anzeigeVorname = '';
-
-  if (nichtKaderModus) {
-    var name = document.getElementById('freitext').value.trim();
-    anzeigeVorname = name.split(' ')[0];
-    var neu = await sb.from('spieler')
-      .insert({ mannschaft_id: mannschaftId, name: name, aktiv: true })
-      .select('id').single();
-    if (neu.error || !neu.data) {
-      zeigeInlineError('Fehler: ' + (neu.error ? neu.error.message : 'unbekannt'));
-      btn.disabled = false; btn.textContent = 'Rückmeldung absenden'; return;
+  async function laden() {
+    if (!SPS.istGueltigesToken(token)) {
+      zeigeError('Ungültiger Link. Bitte beim Mannschaftsführer einen neuen Link anfordern.');
+      return;
     }
-    spielerId = neu.data.id;
-  } else {
-    spielerId = document.getElementById('spieler-select').value;
-    var sel = document.getElementById('spieler-select');
-    anzeigeVorname = sel.options[sel.selectedIndex].text.split(' ')[0];
+    var res;
+    try {
+      res = await sb.rpc('abfrage_laden', { p_token: token });
+    } catch (e) {
+      res = { error: e };
+    }
+    if (res.error || !res.data) {
+      zeigeError(SPS.fehlerText(res.error, 'Spieltermin nicht gefunden. Bitte beim Mannschaftsführer einen neuen Link anfordern.'));
+      return;
+    }
+    daten = res.data;
+    var t = daten.termin, m = daten.mannschaft, alt = daten.alternativtermin;
+    var art = (t.heim ? 'Heimspiel' : 'Auswärtsspiel') + ' gegen ' + t.gegner;
+
+    document.getElementById('spiel-titel').textContent = (alt ? '📅 Ausweichtermin: ' : '') + art;
+    document.getElementById('spiel-meta').innerHTML =
+      esc(m.name) + ' &middot; ' + esc(m.liga) +
+      '<br>' + esc(datumText(alt ? alt.datum : t.datum, alt ? alt.uhrzeit : t.uhrzeit)) +
+      (t.ort ? '<br>' + esc(t.ort) : '') +
+      (alt ? '<br><span style="color:#F07830;font-weight:700">Bitte abstimmen ob ihr an diesem Ausweichtermin spielen könnt</span>' : '');
+    renderFormular();
   }
 
-  var upsertData = {
-    spieltermin_id:    terminId,
-    alternativtermin_id: window._altTerminId || null,
-    spieler_id:        spielerId,
-    antwort:           gewaehlteAntwort,
-    anmerkung:         anmerkung
-  };
-  var res = await sb.from('verfuegbarkeiten').upsert(upsertData,
-    { onConflict: 'spieltermin_id,alternativtermin_id,spieler_id' });
+  function renderFormular() {
+    var spieler = daten.spieler || [];
+    var persoenlich = !!daten.persoenlich;
+    var optionen = spieler.map(function (s) {
+      return '<option value="' + esc(s.id) + '">' + esc(SPS.anzeigeName(s.name)) + '</option>';
+    }).join('');
 
-  if (res.error) {
-    zeigeInlineError('Fehler: ' + res.error.message);
-    btn.disabled = false; btn.textContent = 'Rückmeldung absenden'; return;
+    document.getElementById('card-body').innerHTML =
+      '<div class="field">' +
+        '<label for="spieler-select">Dein Name</label>' +
+        '<select class="spieler-select" id="spieler-select"' + (persoenlich ? ' disabled' : '') + '>' +
+          (persoenlich ? '' : '<option value="">– bitte auswählen –</option>') +
+          optionen +
+        '</select>' +
+        (daten.nachmeldung_erlaubt ? '<button type="button" class="nicht-kader" id="nicht-kader" style="background:none;border:none;padding:0;font:inherit">Ich stehe nicht in der Liste</button>' : '') +
+      '</div>' +
+      '<div class="field hidden" id="freitext-feld">' +
+        '<label for="freitext">Name eingeben (Nachname, Vorname)</label>' +
+        '<input type="text" class="freitext-input" id="freitext" maxlength="60" autocomplete="name" placeholder="Name eingeben">' +
+      '</div>' +
+      '<div class="field">' +
+        '<label>Kannst du spielen?</label>' +
+        '<div class="antwort-gruppe">' +
+          '<button type="button" class="antwort-btn" data-val="Ja" data-cls="sel-ja">Ja</button>' +
+          '<button type="button" class="antwort-btn" data-val="Vielleicht" data-cls="sel-bedingt">Vielleicht</button>' +
+          '<button type="button" class="antwort-btn" data-val="Nein" data-cls="sel-nein">Nein</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="field">' +
+        '<label for="anmerkung">Anmerkung (optional)</label>' +
+        '<textarea class="anmerkung" id="anmerkung" maxlength="500" placeholder="z.B. Kann erst ab 15 Uhr..."></textarea>' +
+      '</div>' +
+      '<button type="button" class="btn-submit" id="btn-senden" disabled>Rückmeldung absenden</button>' +
+      '<div id="error-box" role="alert"></div>';
+
+    document.getElementById('spieler-select').addEventListener('change', pruefeFormular);
+    document.getElementById('freitext').addEventListener('input', pruefeFormular);
+    var nk = document.getElementById('nicht-kader');
+    if (nk) nk.addEventListener('click', toggleFreitext);
+    document.querySelectorAll('.antwort-btn').forEach(function (b) {
+      b.addEventListener('click', function () { waehleAntwort(b); });
+    });
+    document.getElementById('btn-senden').addEventListener('click', abschicken);
+
+    // Persönlicher Link: bisherige Antwort vorbelegen
+    if (persoenlich && daten.eigene_antwort) {
+      var vorher = document.querySelector('.antwort-btn[data-val="' + daten.eigene_antwort.antwort + '"]');
+      if (vorher) waehleAntwort(vorher);
+      document.getElementById('anmerkung').value = daten.eigene_antwort.anmerkung || '';
+    }
+    pruefeFormular();
   }
 
-  document.getElementById('card-body').innerHTML =
-    '<div class="success-box">' +
-      '<div class="success-icon">&#10003;</div>' +
-      '<h2>Danke, ' + anzeigeVorname + '!</h2>' +
-      '<p>Deine Rückmeldung (<strong style="color:var(--teal)">' + gewaehlteAntwort + '</strong>) wurde gespeichert.<br>' +
-      'Du kannst diesen Tab jetzt schließen.</p>' +
-    '</div>';
-}
+  function toggleFreitext() {
+    nichtKaderModus = !nichtKaderModus;
+    document.getElementById('freitext-feld').classList.toggle('hidden', !nichtKaderModus);
+    document.getElementById('spieler-select').classList.toggle('hidden', nichtKaderModus);
+    document.getElementById('nicht-kader').textContent =
+      nichtKaderModus ? '← Zurück zur Auswahlliste' : 'Ich stehe nicht in der Liste';
+    pruefeFormular();
+  }
 
-function zeigeError(msg) {
-  document.getElementById('spiel-titel').textContent = 'Fehler';
-  document.getElementById('card-body').innerHTML = '<div class="error-msg">' + msg + '</div>';
-}
+  function waehleAntwort(btn) {
+    document.querySelectorAll('.antwort-btn').forEach(function (b) {
+      b.classList.remove('sel-ja', 'sel-nein', 'sel-bedingt');
+      b.setAttribute('aria-pressed', 'false');
+    });
+    btn.classList.add(btn.dataset.cls);
+    btn.setAttribute('aria-pressed', 'true');
+    gewaehlteAntwort = btn.dataset.val;
+    pruefeFormular();
+  }
 
-function zeigeInlineError(msg) {
-  document.getElementById('error-box').innerHTML = '<div class="error-msg">' + msg + '</div>';
-}
+  function pruefeFormular() {
+    var nameOk = nichtKaderModus
+      ? document.getElementById('freitext').value.trim().length > 2
+      : document.getElementById('spieler-select').value !== '';
+    document.getElementById('btn-senden').disabled = !(nameOk && gewaehlteAntwort);
+  }
 
-laden();
+  async function abschicken() {
+    var btn = document.getElementById('btn-senden');
+    btn.disabled = true;
+    btn.textContent = 'Wird gespeichert...';
+    document.getElementById('error-box').innerHTML = '';
+
+    var anmerkung = document.getElementById('anmerkung').value.trim() || null;
+    var anzeigeVorname, res;
+    try {
+      if (nichtKaderModus) {
+        var name = document.getElementById('freitext').value.trim();
+        anzeigeVorname = SPS.anzeigeName(name).split(' ')[0];
+        res = await sb.rpc('abfrage_nachmelden', { p_token: token, p_name: name, p_antwort: gewaehlteAntwort, p_anmerkung: anmerkung });
+      } else {
+        var sel = document.getElementById('spieler-select');
+        anzeigeVorname = sel.options[sel.selectedIndex].text.split(' ')[0];
+        res = await sb.rpc('abfrage_antworten', { p_token: token, p_spieler_id: sel.value, p_antwort: gewaehlteAntwort, p_anmerkung: anmerkung });
+      }
+    } catch (e) {
+      res = { error: e };
+    }
+
+    if (res.error) {
+      zeigeInlineError(SPS.fehlerText(res.error, 'Die Rückmeldung konnte nicht gespeichert werden. Bitte erneut versuchen.'));
+      btn.disabled = false; btn.textContent = 'Rückmeldung absenden';
+      return;
+    }
+
+    document.getElementById('card-body').innerHTML =
+      '<div class="success-box">' +
+        '<div class="success-icon">&#10003;</div>' +
+        '<h2>Danke, ' + esc(anzeigeVorname) + '!</h2>' +
+        '<p>Deine Rückmeldung (<strong style="color:var(--teal)">' + esc(gewaehlteAntwort) + '</strong>) wurde gespeichert.<br>' +
+        'Du kannst diesen Tab jetzt schließen.</p>' +
+      '</div>';
+  }
+
+  function zeigeError(msg) {
+    document.getElementById('spiel-titel').textContent = 'Fehler';
+    document.getElementById('card-body').innerHTML = '<div class="error-msg" role="alert">' + esc(msg) + '</div>';
+  }
+
+  function zeigeInlineError(msg) {
+    document.getElementById('error-box').innerHTML = '<div class="error-msg">' + esc(msg) + '</div>';
+  }
+
+  laden();
+})();
 </script>
 </body>
 </html>

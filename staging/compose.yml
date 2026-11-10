@@ -1,0 +1,62 @@
+# Lokaler Staging-Stack (nur synthetische Daten). Offizielle Supabase-Images,
+# ALLE Ports ausschließlich an 127.0.0.1 gebunden (Netzregel docs/STAGING.md).
+# Gestartet und befüllt von scripts/staging.sh – nicht direkt verwenden.
+name: spielplan-staging
+
+services:
+  db:
+    image: supabase/postgres:17.6.1.136        # gleiche Hauptversion wie Produktion (17.6)
+    environment:
+      POSTGRES_PASSWORD: ${STAGING_DB_PW}
+    ports: ["127.0.0.1:55322:5432"]
+    tmpfs: ["/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 2s
+      retries: 60
+
+  auth:
+    image: public.ecr.aws/supabase/gotrue:v2.197.0
+    profiles: ["dienste"]
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      PORT: "9999"
+      API_EXTERNAL_URL: http://127.0.0.1:55321/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_NAMESPACE: auth
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${STAGING_DB_PW}@db:5432/postgres
+      GOTRUE_SITE_URL: http://127.0.0.1:55381
+      GOTRUE_URI_ALLOW_LIST: http://127.0.0.1:55380,http://127.0.0.1:55381
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_JWT_SECRET: ${STAGING_JWT_SECRET}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_RATE_LIMIT_TOKEN_REFRESH: "1000"
+    depends_on: { db: { condition: service_healthy } }
+
+  rest:
+    image: public.ecr.aws/supabase/postgrest:v16.5
+    profiles: ["dienste"]
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${STAGING_DB_PW}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${STAGING_JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on: { db: { condition: service_healthy } }
+
+  kong:
+    image: public.ecr.aws/supabase/kong:2.8.1
+    profiles: ["dienste"]
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_PLUGINS: cors
+      KONG_DNS_ORDER: LAST,A,CNAME
+    volumes: ["./kong.yml:/home/kong/kong.yml:ro"]
+    ports: ["127.0.0.1:55321:8000"]
+    depends_on: [auth, rest]

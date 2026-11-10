@@ -15,6 +15,43 @@ function _vornameVoll(dbName) {
   return p.length === 2 ? p[1].trim() + ' ' + p[0].trim() : dbName;
 }
 
+
+// ── Gemeinsame Datenbasis: nur benötigte Spalten, Fehler werden gemeldet,
+//    gefiltert auf die im Leitstand gewählte Halbrunde/Saison ─────────────
+function _rundeLabel() {
+  return (typeof aktiveHalbrunde !== 'undefined' ? aktiveHalbrunde : 'Vorrunde') + ' ' +
+         ((typeof aktiveSaison !== 'undefined' && aktiveSaison) || SPRunde.aktuelleSaison());
+}
+function _rundeLabelAscii() {
+  return _rundeLabel().replace('ü', 'ue');   // jsPDF-Standardschrift ohne Umlaute
+}
+async function _ladeExportDaten(mf, mitAufstellung) {
+  const [termRes, spRes] = await Promise.all([
+    sb.from('spieltermine').select('id, datum, uhrzeit, heim, gegner, ort, halbrunde, status, saison').eq('mannschaft_id', mf.id).order('datum'),
+    sb.from('spieler').select('id, name, ttr, position').eq('mannschaft_id', mf.id).eq('aktiv', true).order(mitAufstellung ? 'position' : 'name')
+  ]);
+  if (termRes.error) throw termRes.error;
+  if (spRes.error) throw spRes.error;
+  const termine = SPRunde.filterTermine(termRes.data || [],
+    typeof aktiveHalbrunde !== 'undefined' ? aktiveHalbrunde : null,
+    typeof aktiveSaison !== 'undefined' ? aktiveSaison : null);
+  const spieler = spRes.data || [];
+  let verfueg = [], aufstellungen = [];
+  if (termine.length > 0) {
+    const ids = termine.map(t => t.id);
+    if (mitAufstellung) {
+      const r = await sb.from('aufstellungen').select('spieltermin_id, spieler_id, ersatz_mannschaft_id').in('spieltermin_id', ids);
+      if (r.error) throw r.error;
+      aufstellungen = r.data || [];
+    } else {
+      const r = await sb.from('verfuegbarkeiten').select('spieltermin_id, alternativtermin_id, spieler_id, antwort').in('spieltermin_id', ids);
+      if (r.error) throw r.error;
+      verfueg = r.data || [];
+    }
+  }
+  return { termine, spieler, verfueg, aufstellungen };
+}
+
 // ============================================================
 // EXCEL-EXPORT · ExcelJS
 // ============================================================
@@ -51,20 +88,7 @@ async function exportExcel() {
     const _mf = aktiveMannschaft || alleMannschaften[0];
     if (!_mf) throw new Error('Keine Mannschaft aktiv');
     for (const mf of [_mf]) {
-      const [termRes, spRes] = await Promise.all([
-        sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
-        sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('name')
-      ]);
-
-      const termine = termRes.data || [];
-      const spieler = spRes.data  || [];
-      let verfueg = [];
-
-      if (termine.length > 0) {
-        const { data: vd } = await sb.from('verfuegbarkeiten')
-          .select('*').in('spieltermin_id', termine.map(t => t.id));
-        verfueg = vd || [];
-      }
+      const { termine, spieler, verfueg } = await _ladeExportDaten(mf, false);
 
       const minSp = mf.min_spieler || 6;
 
@@ -90,7 +114,7 @@ async function exportExcel() {
       // ── Zeile 1: Titelbalken ────────────────────────────
       ws.mergeCells(1, 1, 1, 5 + nSp);
       const t1 = ws.getCell('A1');
-      t1.value = `FC Strass e.V.  ·  Verfügbarkeit Vorrunde 2026/27  ·  ${mf.name}  ·  ${mf.liga}`;
+      t1.value = `FC Strass e.V.  ·  Verfügbarkeit ${_rundeLabel()}  ·  ${mf.name}  ·  ${mf.liga}`;
       t1.font  = font(WHITE, true, 13);
       t1.fill  = fill(NAVY);
       t1.alignment = { horizontal: 'left', vertical: 'middle' };
@@ -224,7 +248,7 @@ async function exportExcel() {
     document.body.removeChild(a); URL.revokeObjectURL(url);
 
   } catch (err) {
-    alert('Fehler beim Excel-Export: ' + err.message);
+    alert('Fehler beim Excel-Export: ' + SPS.fehlerText(err));
     console.error(err);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '📊 Excel exportieren'; }
@@ -236,6 +260,8 @@ function ladeExcelJS() {
     if (window.ExcelJS) { resolve(); return; }
     const s = document.createElement('script');
     s.src = 'https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js';
+    s.integrity = 'sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz';
+    s.crossOrigin = 'anonymous';
     s.onload = resolve;
     s.onerror = () => reject(new Error('ExcelJS konnte nicht geladen werden'));
     document.head.appendChild(s);
@@ -271,20 +297,7 @@ async function exportPDF() {
     const mf = aktiveMannschaft || alleMannschaften[0];
     if (!mf) throw new Error('Keine Mannschaft aktiv');
 
-    const [termRes, spRes] = await Promise.all([
-      sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
-      sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('name')
-    ]);
-
-    const termine = termRes.data || [];
-    const spieler = spRes.data  || [];
-    let verfueg = [];
-
-    if (termine.length > 0) {
-      const { data: vd } = await sb.from('verfuegbarkeiten')
-        .select('*').in('spieltermin_id', termine.map(t => t.id));
-      verfueg = vd || [];
-    }
+    const { termine, spieler, verfueg } = await _ladeExportDaten(mf, false);
 
     const minSpieler = mf.min_spieler || 6;
 
@@ -320,7 +333,7 @@ async function exportPDF() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(...MUTED);
-      doc.text('Verfuegbarkeit Vorrunde 2026/27', ML + 7, 24);
+      doc.text('Verfuegbarkeit ' + _rundeLabelAscii(), ML + 7, 24);
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
@@ -485,7 +498,7 @@ async function exportPDF() {
     doc.save('FCStrass_' + name + '_Verfuegbarkeit_' + heute + '.pdf');
 
   } catch (err) {
-    alert('Fehler beim PDF-Export: ' + err.message);
+    alert('Fehler beim PDF-Export: ' + SPS.fehlerText(err));
     console.error(err);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '📄 PDF exportieren'; }
@@ -497,9 +510,13 @@ function ladePDFLibs() {
     if (window.jspdf && window.jspdf.jsPDF) { resolve(); return; }
     const s1 = document.createElement('script');
     s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s1.integrity = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';
+    s1.crossOrigin = 'anonymous';
     s1.onload = () => {
       const s2 = document.createElement('script');
       s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+      s2.integrity = 'sha384-fCAW/rDWORTbQXSiB7mOg0QtQ5c+r0f544y6XoKjuVva0nMBlCpNUjiFeG5iMdS3';
+      s2.crossOrigin = 'anonymous';
       s2.onload = resolve;
       s2.onerror = () => reject(new Error('autoTable konnte nicht geladen werden'));
       document.head.appendChild(s2);
@@ -527,17 +544,7 @@ async function exportAufstellungPDF() {
     const mf = aktiveMannschaft || alleMannschaften[0];
     if (!mf) throw new Error('Keine Mannschaft aktiv');
 
-    const [termRes, spRes] = await Promise.all([
-      sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
-      sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('position')
-    ]);
-    const termine = termRes.data || [];
-    const spieler = spRes.data || [];
-    let aufstellungen = [];
-    if (termine.length > 0) {
-      const { data: ad } = await sb.from('aufstellungen').select('*').in('spieltermin_id', termine.map(t => t.id));
-      aufstellungen = ad || [];
-    }
+    const { termine, spieler, aufstellungen } = await _ladeExportDaten(mf, true);
 
     const minSp = mf.min_spieler || 6;
     const spielerById = Object.fromEntries(spieler.map(s => [s.id, s]));
@@ -570,7 +577,7 @@ async function exportAufstellungPDF() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...MUTED);
-    doc.text('Einsatzplan / Aufstellung Vorrunde 2026/27', ML + 7, 24);
+    doc.text('Einsatzplan / Aufstellung ' + _rundeLabelAscii(), ML + 7, 24);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...ORANGE);
@@ -695,7 +702,7 @@ async function exportAufstellungPDF() {
     doc.save('FCStrass_' + name + '_Einsatzplan_' + heute + '.pdf');
 
   } catch (err) {
-    alert('Fehler beim Aufstellungs-PDF: ' + err.message);
+    alert('Fehler beim Aufstellungs-PDF: ' + SPS.fehlerText(err));
     console.error(err);
   }
 }
@@ -723,17 +730,7 @@ async function exportAufstellungExcel() {
     const mf = aktiveMannschaft || alleMannschaften[0];
     if (!mf) throw new Error('Keine Mannschaft aktiv');
 
-    const [termRes, spRes] = await Promise.all([
-      sb.from('spieltermine').select('*').eq('mannschaft_id', mf.id).order('datum'),
-      sb.from('spieler').select('*').eq('mannschaft_id', mf.id).eq('aktiv', true).order('position')
-    ]);
-    const termine = termRes.data || [];
-    const spieler = spRes.data || [];
-    let aufstellungen = [];
-    if (termine.length > 0) {
-      const { data: ad } = await sb.from('aufstellungen').select('*').in('spieltermin_id', termine.map(t => t.id));
-      aufstellungen = ad || [];
-    }
+    const { termine, spieler, aufstellungen } = await _ladeExportDaten(mf, true);
 
     const minSp = mf.min_spieler || 6;
     const spielerById = Object.fromEntries(spieler.map(s => [s.id, s]));
@@ -753,7 +750,7 @@ async function exportAufstellungExcel() {
     // Titel
     ws.mergeCells(1,1,1,4+minSp);
     const t1 = ws.getCell('A1');
-    t1.value = `FC Strass e.V.  ·  Einsatzplan Vorrunde 2026/27  ·  ${mf.name}  ·  ${mf.liga}`;
+    t1.value = `FC Strass e.V.  ·  Einsatzplan ${_rundeLabel()}  ·  ${mf.name}  ·  ${mf.liga}`;
     t1.font = font(WHITE,true,13); t1.fill = fill(NAVY); t1.alignment = align('left');
     ws.getRow(1).height = 30;
 
@@ -826,7 +823,7 @@ async function exportAufstellungExcel() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 
   } catch (err) {
-    alert('Fehler beim Aufstellungs-Excel: ' + err.message);
+    alert('Fehler beim Aufstellungs-Excel: ' + SPS.fehlerText(err));
     console.error(err);
   }
 }
@@ -859,7 +856,7 @@ function zeigeExportMenu() {
       '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">' +
         '<div>' +
           '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:#F07830">Export</div>' +
-          '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + mfName + ' · aktueller Tab</div>' +
+          '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + SPS.esc(mfName) + ' · ' + SPS.esc(_rundeLabel()) + '</div>' +
         '</div>' +
         '<button onclick="document.getElementById(\'export-menu-overlay\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
       '</div>' +

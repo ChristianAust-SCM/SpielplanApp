@@ -1,0 +1,19 @@
+node_modules/
+.env
+.env.*
+*.log
+.DS_Store
+
+# Lokale Staging-Umgebung (erzeugt von scripts/staging.sh)
+staging/www-alt/
+staging/www-neu/
+staging/supabase/migrations/
+staging/supabase/seed.sql
+staging/supabase/.temp/
+staging/http-*.log
+staging/http-*.pid
+test-results/
+playwright-report/
+supabase/.temp/
+staging/supabase/.branches/
+staging/.laufzeit.env

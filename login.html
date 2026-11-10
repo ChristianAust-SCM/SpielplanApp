@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Login · Spielplan-App</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <meta name="referrer" content="no-referrer">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="js/config.js"></script>
+  <script src="js/sicherheit.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -64,9 +67,7 @@
 <div class="footer">Probleme beim Login? Wende dich an Christian Aust.</div>
 
 <script>
-const SUPABASE_URL  = 'https://nwutgxjnverlvmkrpiep.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_09tn0DY3wswcIVQ-mN1S8A_znKWQXaF';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const sb = window.supabase.createClient(APP_CONFIG.SUPABASE_URL, APP_CONFIG.SUPABASE_ANON);
 
 // Bereits eingeloggt? Direkt weiterleiten
 sb.auth.getSession().then(function(res) {
@@ -85,7 +86,9 @@ async function anmelden() {
   document.getElementById('error-box').innerHTML = '';
   const { error } = await sb.auth.signInWithPassword({ email: email, password: passwort });
   if (error) {
-    zeigeFehler('Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.');
+    zeigeFehler(/fetch|network/i.test(error.message || '')
+      ? 'Keine Verbindung zum Server. Bitte Internetverbindung prüfen.'
+      : 'Anmeldung fehlgeschlagen. E-Mail oder Passwort falsch.');
     btn.disabled = false;
     btn.textContent = 'Anmelden';
     return;
@@ -94,7 +97,7 @@ async function anmelden() {
 }
 
 function zeigeFehler(msg) {
-  document.getElementById('error-box').innerHTML = '<div class="error-msg">' + msg + '</div>';
+  document.getElementById('error-box').innerHTML = '<div class="error-msg" role="alert">' + SPS.esc(msg) + '</div>';
 }
 </script>
 </body>
