@@ -11,7 +11,11 @@
     SUPABASE_URL: 'https://nwutgxjnverlvmkrpiep.supabase.co',
     SUPABASE_ANON: 'sb_publishable_09tn0DY3wswcIVQ-mN1S8A_znKWQXaF',
     BASIS_URL: 'https://spielplanapp.christianaust.eu/',
-    VEREIN_KUERZEL: 'fcstrass'
+    VEREIN_KUERZEL: 'fcstrass',
+    // Reiter „Turnier-Helfer“ im Leitstand (nur Admin). Standardmäßig aus;
+    // Funktion, helfer.html und Daten (turnier_helfer) bleiben erhalten.
+    // Reaktivieren: auf true setzen.
+    TURNIER_HELFER_ANZEIGEN: false
   });
   if (typeof module !== 'undefined' && module.exports) module.exports = APP_CONFIG;
   else root.APP_CONFIG = APP_CONFIG;

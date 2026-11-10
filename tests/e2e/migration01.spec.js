@@ -66,7 +66,8 @@ test.describe(`Altes Frontend · Stufe ${STUFE_ROH}`, () => {
 
   test('Admin-Anmeldung zeigt Admin-Funktionen', async ({ page }) => {
     await anmelden(page, 'admin@test.invalid');
-    await expect(page.locator('#tabs .tab-turnier')).toBeVisible();
+    // Admin sieht alle drei Mannschaften (Turnier-Helfer-Reiter ist seit 2.0 standardmäßig ausgeblendet)
+    await expect(page.locator('#tabs .tab:not(.tab-turnier)')).toHaveCount(3);
   });
 
   test('Spieler antwortet ohne Login über bestehenden Link', async ({ page }) => {

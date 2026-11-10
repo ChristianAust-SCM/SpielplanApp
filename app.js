@@ -139,7 +139,7 @@ function renderTabs() {
     '</button>'
   ).join('');
 
-  if (istAdmin) {
+  if (istAdmin && APP_CONFIG.TURNIER_HELFER_ANZEIGEN === true) {
     html += '<button class="tab tab-turnier" onclick="ladeTurnierHelfer()" data-id="turnier-helfer">Turnier-Helfer</button>';
   }
   el.innerHTML = html;
