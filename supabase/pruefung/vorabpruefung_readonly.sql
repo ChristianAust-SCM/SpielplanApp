@@ -62,4 +62,50 @@ select event_object_table, trigger_name from information_schema.triggers
  where event_object_schema = 'public'
    and event_object_table in ('spieltermine','alternativtermine','verfuegbarkeiten','nutzer_rollen');
 
+-- 10. Speziell Migration 01 ------------------------------------------------
+-- 10a. Aktuelle Policies auf nutzer_rollen (Soll laut Audit: genau
+--      "Admins verwalten Rollen" + "Eigene Rollen lesen"; Abweichung = Drift)
+select policyname, cmd, roles::text, qual, with_check
+  from pg_policies where schemaname = 'public' and tablename = 'nutzer_rollen' order by 1;
+
+-- 10b. Eigentümer und RLS-Flags (Soll: Owner postgres, RLS an, nicht FORCE)
+select c.relname, pg_get_userbyid(c.relowner) as owner, c.relrowsecurity, c.relforcerowsecurity
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relname = 'nutzer_rollen';
+
+-- 10c. Ausführende Rolle (Migration läuft als diese Rolle; Soll: postgres)
+select current_user, r.rolbypassrls, r.rolsuper
+  from pg_roles r where r.rolname = current_user;
+
+-- 10d. Policies anderer Tabellen, die nutzer_rollen verwenden (Soll: nur
+--      aufstellungen, nur Rolle authenticated – anon verliert den Zugriff)
+select tablename, policyname, roles::text
+  from pg_policies
+ where schemaname = 'public' and tablename <> 'nutzer_rollen'
+   and (coalesce(qual,'') like '%nutzer_rollen%' or coalesce(with_check,'') like '%nutzer_rollen%')
+ order by 1, 2;
+
+-- 10e. Funktionen/Views außerhalb der Plattformschemas, die nutzer_rollen
+--      referenzieren (Soll: keine – sonst eigener Schreibweg an RLS vorbei)
+select n.nspname, p.proname, p.prosecdef
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname not in ('pg_catalog','information_schema','auth','storage','realtime','vault',
+                         'extensions','graphql','graphql_public','pgbouncer','supabase_functions')
+   and p.prosrc like '%nutzer_rollen%';
+select schemaname, viewname from pg_views
+ where definition like '%nutzer_rollen%' and schemaname not in ('pg_catalog','information_schema');
+
+-- 10f. Anzahl verschiedener Admin-Konten (Soll: >= 1; letzter-Admin-Schutz)
+--      und Rollen, deren Konto nicht mehr existiert (nur Anzahl)
+select count(distinct user_id) filter (where rolle = 'admin') as admin_konten,
+       count(distinct user_id) filter (where rolle = 'mf')    as mf_konten,
+       count(*) filter (where user_id is null)                as rollen_ohne_konto
+  from public.nutzer_rollen;
+
+-- 10g. Rollen, die seit dem Audit (09.11.2026 11:56 UTC+1) angelegt wurden
+--      (Hinweis auf mögliche Selbstvergabe; nur Anzahl je Rolle)
+select rolle, count(*) as neu_seit_audit
+  from public.nutzer_rollen where created_at > timestamptz '2026-11-09 10:56:00+00'
+ group by rolle;
+
 rollback;

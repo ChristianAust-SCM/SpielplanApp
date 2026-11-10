@@ -7,7 +7,7 @@ eine eigene ausdrückliche Freigabe von Christian.
 
 | Datei | Inhalt | Kompatibel mit altem Frontend | Rückfall |
 |---|---|---|---|
-| `20261110000100_sicherheit_rollen_und_hilfsfunktionen.sql` | Selbstvergabe von Adminrechten verhindert, TRUNCATE/TRIGGER/REFERENCES entzogen, Berechtigungsfunktionen, Schutz des letzten Admins | ja | Policies „Admins verwalten Rollen“/„Eigene Rollen lesen“ neu anlegen (nicht empfohlen) |
+| `20261110000100_sicherheit_rollen_und_hilfsfunktionen.sql` | Selbstvergabe von Adminrechten verhindert, TRUNCATE/TRIGGER/REFERENCES entzogen, Berechtigungsfunktionen, Schutz des letzten Admins | ja | `supabase/rollback/R01_rollen_policies_wiederherstellen.sql` (nur solange 02 nicht angewendet; öffnet die Lücke wieder) |
 | `20261110000200_spielerlinks_und_serverfunktionen.sql` | Spalten `min_spieler`, `saison` (generiert), `nachgemeldet_am`; Unique-Index Alternativtermine; `private.einstellungen`, `private.abfrage_links`; RPCs; Integritäts-Trigger | ja | additiv; Funktionen/Trigger droppen |
 | `20261110000300_rls_mannschaftsgrenzen.sql` | Policies neu: MF je Mannschaft, Admin global; anon-Altpfad spalten- und zeilenweise begrenzt | ja (getestet in `70_altpfad_kompatibel.sql`) | Gegenmigration mit Baseline-Policies (nur im Notfall) |
 | `20261110000400_rueckrunde_terminimport.sql` | `termine_importieren` (Vorschau + transaktionaler Import) | ja | Funktion droppen |
@@ -59,6 +59,7 @@ Transaktion und wird bei einem Fehler vollständig zurückgerollt.
 ## 4. Rückfall
 
 * Frontend: `git revert` auf den letzten verifizierten Pages-Commit.
+* Datenbank nach nur 01: `R01_…` stellt den Zustand vor 01 exakt wieder her (im Test per Katalogvergleich nachgewiesen); verweigert sich, sobald 02 angewendet ist.
 * Datenbank nach 09: `R09_…` stellt den eingeschränkten Altpfad wieder her.
   Das ist ausdrücklich **nicht** der unsichere Ursprungszustand. Nur befristet
   einsetzen, mit festgelegtem Verantwortlichen und Ablaufdatum.

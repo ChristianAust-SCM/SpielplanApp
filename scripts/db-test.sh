@@ -81,6 +81,40 @@ anwenden "$ROOT/supabase/baseline/00_produktion_rekonstruiert.sql"
 anwenden "$ROOT/supabase/tests/_seed.sql"
 for t in "$ROOT"/supabase/tests/1[0-9]_*.sql; do testen "$t"; done
 
+if "${PSQL[@]}" -f "$ROOT/supabase/pruefung/vorabpruefung_readonly.sql" >/dev/null 2>"$ROOT/.vorab.err"; then
+  echo "  ✓ Vorabprüfung läuft fehlerfrei gegen den Ist-Zustand (read-only-Transaktion)"
+else
+  echo "  ✗ Vorabprüfung fehlerhaft:"; sed 's/^/      /' "$ROOT/.vorab.err"; FEHLER=$((FEHLER+1))
+fi
+rm -f "$ROOT/.vorab.err"
+
+echo "▶ Stufe 1b: Migration 01 allein (Einzelfreigabe), SR-Unberührtheit, Rückfall R01"
+anwenden "$ROOT/supabase/tests/_sr_platzhalter.sql"
+SNAP_DIR="$(mktemp -d)"
+snapshot() { "${PSQL[@]}" -v bereich="$1" -f "$ROOT/supabase/tests/_katalog_snapshot.sql" > "$SNAP_DIR/$2"; }
+vergleiche() {  # $1 $2 Snapshot-Dateien, $3 Beschreibung
+  if diff -u "$SNAP_DIR/$1" "$SNAP_DIR/$2" > "$SNAP_DIR/diff.txt"; then
+    echo "  ✓ $3"
+  else
+    echo "  ✗ $3:"; sed 's/^/      /' "$SNAP_DIR/diff.txt" | head -40; FEHLER=$((FEHLER+1))
+  fi
+}
+snapshot alle vorher_alle.txt
+snapshot sr   vorher_sr.txt
+anwenden "$ROOT/supabase/migrations/20261110000100_sicherheit_rollen_und_hilfsfunktionen.sql"
+snapshot sr   nach01_sr.txt
+vergleiche vorher_sr.txt nach01_sr.txt "Migration 01 ändert nichts außerhalb der Spielplan-Tabellen (SR-Platzhalter, public-Funktionen)"
+testen "$ROOT/supabase/tests/20_rollen.sql"
+testen "$ROOT/supabase/tests/90_migration01_allein.sql"
+anwenden "$ROOT/supabase/migrations/20261110000100_sicherheit_rollen_und_hilfsfunktionen.sql"
+echo "  · Idempotenz: Migration 01 erneut"
+testen "$ROOT/supabase/tests/90_migration01_allein.sql"
+anwenden "$ROOT/supabase/rollback/R01_rollen_policies_wiederherstellen.sql"
+snapshot alle nachR01_alle.txt
+vergleiche vorher_alle.txt nachR01_alle.txt "Rückfall R01 stellt den Katalog-Ausgangszustand exakt wieder her"
+for t in "$ROOT"/supabase/tests/1[0-9]_*.sql; do testen "$t"; done
+rm -rf "$SNAP_DIR"
+
 echo "▶ Stufe 2: Migrationen 01–04"
 for m in "$ROOT"/supabase/migrations/2026111000010*.sql "$ROOT"/supabase/migrations/2026111000020*.sql \
          "$ROOT"/supabase/migrations/2026111000030*.sql "$ROOT"/supabase/migrations/2026111000040*.sql; do
@@ -91,6 +125,11 @@ anwenden "$ROOT/supabase/migrations/20261110000100_sicherheit_rollen_und_hilfsfu
 anwenden "$ROOT/supabase/migrations/20261110000200_spielerlinks_und_serverfunktionen.sql"
 anwenden "$ROOT/supabase/migrations/20261110000400_rueckrunde_terminimport.sql"
 for t in "$ROOT"/supabase/tests/[2-7][0-9]_*.sql; do testen "$t"; done
+if "${PSQL[@]}" -f "$ROOT/supabase/rollback/R01_rollen_policies_wiederherstellen.sql" >/dev/null 2>&1; then
+  echo "  ✗ R01 lief trotz angewendeter Migration 02 durch"; FEHLER=$((FEHLER+1))
+else
+  echo "  ✓ R01 verweigert sich, sobald Migration 02 angewendet ist"
+fi
 
 echo "▶ Stufe 3: Migration 09 (anonymer Tabellenzugriff entzogen)"
 anwenden "$ROOT/supabase/migrations/20261110000900_anon_tabellenzugriff_entziehen.sql"
