@@ -280,7 +280,7 @@ test.describe('Smartphone-Darstellung', () => {
 
   test('Leitstand: Tabelle scrollt im eigenen Container, Seite nicht', async ({ page }) => {
     await anmelden(page, 'mf1@test.invalid');
-    const breit = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const breit = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth);
     expect(breit).toBeLessThanOrEqual(1);
     await expect(page.locator('.table-scroll')).toBeVisible();
     await expect(page.locator('#stat-gesamt')).toBeVisible();

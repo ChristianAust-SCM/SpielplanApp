@@ -7,6 +7,8 @@ Funktionsprobe A7 durch Christian bestanden.
 **Stufe B produktiv** (Merge-Commit `7458cf4` auf `main`, GitHub Pages, Live-Auslieferung geprüft, Live-Kurztest 4/4).
 **Stufe C produktiv** (10:30, Gibbs-Task `t_73fe039a`, Backup `2026-11-10_102118`; anon nur noch `vereinsbefragung` INSERT;
 Spielerabfrage als anon mit 5 echten Links vorher/nachher 5/5; Admin/MF unverändert; SR-Policies 19; R09 bereit).
+**Premium-Design + Turnier-Helfer ausgeblendet produktiv** (10.11.2026, Merge-Commit `f73403c` auf `main`, Pages „built“,
+15 Live-Dateien identisch, Live-Kurztest 4/4; Rückfall: `git revert -m 1 f73403c`).
 Alles Weitere ist in Staging mit echtem Stack geprüft (`docs/STAGING.md`, 38/38).
 
 Jede Stufe hat eine eigene Freigabe. Ausführung der Datenbankschritte durch Gibbs

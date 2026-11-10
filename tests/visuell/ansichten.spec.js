@@ -23,7 +23,7 @@ async function anmelden(page, email) {
   await page.evaluate(() => document.fonts.ready);
 }
 async function keinQuerscrollen(page) {
-  const b = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
+  const b = await page.evaluate(() => [Math.max(document.documentElement.scrollWidth, document.body.scrollWidth), window.innerWidth]);
   expect(b[0], 'Seite scrollt nicht horizontal').toBeLessThanOrEqual(b[1] + 1);
 }
 
@@ -38,7 +38,8 @@ test('1 · Spielplanübersicht mit Verfügbarkeitsampel (Desktop)', async ({ bro
   await expect(page.locator('#tabs .tab-turnier')).toHaveCount(0);
   await expect(page.locator('#table-container tbody tr')).toHaveCount(9);
   await expect(page.locator('#stat-gesamt')).toHaveText('9');
-  await expect(page.locator('#stat-offen')).toHaveText('0');
+  await expect(page.locator('.k-offen .stat-label')).toHaveText('Spieltage ohne Antworten');
+  await expect(page.locator('#stat-offen')).toHaveText('0');                 // jeder Spieltag hat Antworten (8 / 9)
   await expect(page.locator('#stat-krit')).toHaveText('1');
   await expect(page.locator('#stat-ok')).toHaveText('8');
   const krit = page.locator('tr.zeile-kritisch');
