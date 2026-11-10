@@ -1,75 +1,61 @@
-# Staging-Test mit echtem Supabase-Stack und Browser (Lücken T1/T2)
+# Staging mit echtem Supabase-Stack und Browsern
 
-Lokal, isoliert, nur synthetische Daten. Keine Verbindung zur Produktion: Die
-ausgelieferten Kopien des Frontends bekommen die URL und den Key des lokalen
-Stacks. Das Skript bricht ab, falls die produktive URL noch enthalten ist.
+Lokal, isoliert, nur synthetische Daten. Es gibt keine Verbindung zur Produktion.
+Die ausgelieferten Kopien des Frontends bekommen URL und Schlüssel des lokalen
+Stacks. Das Skript bricht ab, wenn die produktive URL darin verbleibt. Die
+Browser-Specs blockieren jede Anfrage an `*.supabase.co`, `*.christianaust.eu`
+und WhatsApp und lassen den Test dann fehlschlagen.
+
+## Verbindliche Netzregel
+
+Die Testports dürfen **nicht ungeschützt auf allen Netzwerkschnittstellen**
+erreichbar sein.
+
+* Der Stack läuft deshalb **nicht** über die Supabase-CLI, denn die bindet an
+  `0.0.0.0`. Er läuft über ein eigenes Compose (`staging/compose.yml`), das alle
+  Ports ausschließlich an `127.0.0.1` bindet:
+  * 55321: API über Kong
+  * 55322: Datenbank
+  * 55380/55381: Frontend alt/neu, als Python-Webserver
+* `scripts/staging.sh` prüft nach jedem Start die Bindungen. Ist ein Port an
+  `0.0.0.0` oder `[::]` gebunden, beendet es den Stack sofort (Exit 3).
+* Datenbankpasswort und JWT-Secret werden bei jedem Start zufällig erzeugt
+  (`staging/.laufzeit.env`, Modus 600, gitignored) und beim Stop gelöscht.
+* Am 10.11.2026 lief der erste Staging-Lauf noch über die CLI; die Ports lagen
+  kurzzeitig auf `0.0.0.0`, mit rein synthetischen Daten. Das ist seitdem abgestellt.
 
 ## Bestandteile
 
 | Datei | Zweck |
 |---|---|
-| `staging/supabase/config.toml` | lokaler Stack `spielplan-staging`, Ports 553xx (kollisionsfrei), Studio/Storage/Realtime/Analytics aus, Registrierung aus |
-| `staging/seed_staging.sql` | macht die synthetischen Konten anmeldefähig (Passwort `staging-lokal-1`, nur lokal) |
-| `scripts/staging.sh` | Start/Stop, Migrationen einzeln, Frontend alt (`main`) bzw. neu, Smoke-Tests |
-| `tests/e2e/migration01.spec.js` | Browser- und REST-Smoke-Tests für das alte Frontend: Ist-Zustand und nach 01 |
-| `tests/e2e/playwright.config.js` | Chromium (Desktop) und WebKit (iPhone 13) |
+| `staging/compose.yml`, `staging/kong.yml` | Offizielle Images: Postgres 17.6.1.136 (wie Produktion 17.6), GoTrue 2.197, PostgREST 16.5, Kong 2.8.1 |
+| `staging/seed_staging.sql` | Testkonten anmeldefähig (Passwort `staging-lokal-1`), Admin mit Rolle für alle Mannschaften wie produktiv |
+| `scripts/staging.sh` | `start`, `migriere <nr>`, `frontend alt\|neu`, `smoke <stufe>`, `lauf01`, `laufrollout`, `stop` |
+| `tests/e2e/migration01.spec.js` | altes Frontend: Ist-Zustand, nach 01, Übergangsphase (`kompat`) |
+| `tests/e2e/neu.spec.js` | neues Frontend: komplette Abnahme (Stufen `neu`, `09`) und Smartphone |
+| `tests/e2e/playwright.config.js` | Chromium Desktop und WebKit iPhone 13 im offiziellen Image `mcr.microsoft.com/playwright:v1.49.1-noble` (keine Systeminstallation) |
 
-Die Browser laufen im offiziellen Image `mcr.microsoft.com/playwright:v1.49.1-noble`
-(`--network host`). Auf dem Host fehlen Systembibliotheken für die Browser, und eine
-`apt`-Installation wäre systemweit. Die Specs blockieren und melden jede Browser-Anfrage
-an `*.supabase.co` oder `*.christianaust.eu`.
+## Läufe
 
-**Verbindliche Regel Netz (seit 10.11.2026):** Die Supabase-Testports (553xx: API, DB,
-Mailpit) dürfen **nicht ungeschützt auf allen Netzwerkschnittstellen** erreichbar sein.
-Die Supabase-CLI bindet sie an `0.0.0.0`, und das lässt sich in der CLI nicht abstellen.
-Beim Lauf am 10.11.2026 waren sie deshalb kurzzeitig ungeschützt offen; es lagen
-nur synthetische Daten darin.
+```bash
+scripts/staging.sh lauf01        # Migration 01: ist → 01 → R01 → 01
+scripts/staging.sh laufrollout   # 01–05 → altes FE kompatibel → neues FE → 09 → neues FE
+```
 
-* `scripts/staging.sh` prüft die Bindungen nach dem Start. Ist ein Port auf
-  `0.0.0.0` oder `[::]` gebunden, wird der Stack **sofort beendet** (Exit 3).
-* Weiter geht es nur, wenn eine Absicherung eingerichtet und bestätigt ist:
-  * Host-Firewall: Regel in der `DOCKER-USER`-Kette, die 55320–55399 nur von
-    `127.0.0.1`/`docker0` zulässt. Docker umgeht `ufw`, daher muss es `DOCKER-USER` sein.
-  * Bestätigung pro Lauf: `STAGING_PORTS_GESCHUETZT=1 scripts/staging.sh lauf01`.
-* Die Firewall-Regel ist eine systemweite Änderung und braucht Christians Freigabe.
-* Alternative ohne Firewall: den Stack nicht über die CLI starten, sondern per
-  eigenem Compose mit `127.0.0.1:`-Portbindungen. Das ist noch nicht umgesetzt.
+Beide Läufe räumen am Ende selbst auf (Container, Volumes, Laufzeitdateien).
 
-Beim Start enthält die Datenbank die Baseline. Das ist der Ist-Zustand, am
-10.11.2026 mit den produktiven Spalten abgeglichen. Dazu kommen die Testdaten
-und die SR-Platzhalter.
+## Ergebnisse 10.11.2026
 
-## Ablauf Migration 01 (`npm run test:staging01` bzw. `scripts/staging.sh lauf01`)
+| Lauf | Ergebnis |
+|---|---|
+| `lauf01` (Compose, nur localhost) | bestanden: 34 Tests, 2 Katalogvergleiche |
+| `laufrollout` | bestanden: 9 (altes FE, Übergang) + 15 (neues FE nach 01–05) + 14 (neues FE nach 09) = **38 Tests**; SR-/Fremdobjekte nach 01–05 und nach 09 unverändert |
 
-1. Stack starten, Frontend von `main` auf `127.0.0.1:55380`
-2. Smoke `ist`: MF-/Admin-Login, Spielerlink ohne Login, Selbstvergabe per REST **gelingt** (Lücke)
-3. Migration 01 → Smoke `01`: gleiche Funktionen, Selbstvergabe → HTTP 403, MF-Hochstufung ändert nichts
-4. Rückfall R01 → Smoke `ist` (Ausgangszustand wieder da)
-5. Migration 01 erneut → Smoke `01`
-6. `scripts/staging.sh stop`: Stack und Daten verwerfen
+## Voraussetzungen (eingerichtet)
 
-Spätere Stufen, gleiche Umgebung: `migriere 02/03/04/05`, `frontend neu`,
-danach `migriere 09`. Die Smoke-Specs für das neue Frontend folgen nach
-Freigabe von 01.
-
-## Ergebnis 10.11.2026
-
-`scripts/staging.sh lauf01`: **bestanden** (Exit 0), 34 Browser-/REST-Tests in 4 Stufen,
-2 Katalogvergleiche gegen den echten Stack. Details: `docs/FREIGABE_MIGRATION01_2026-11-10.md` §9.
-
-## Voraussetzungen (am 10.11.2026 erledigt)
-
-* **Docker-Images des Supabase-Stacks laden.** `supabase start` lädt beim ersten
-  Lauf etwa 8 Images (GoTrue, PostgREST, Kong u. a., mehrere GB). Lokal liegt
-  bisher nur `supabase/postgres:17.6.1.136`.
-* **Playwright projektlokal installieren:**
-  `npm install -D @playwright/test@1.49.1 && npx playwright install chromium webkit`.
-  Das schreibt in `node_modules/` und in den Browser-Cache unter `~/.cache/ms-playwright`.
-* `npm`/`npx`: benutzerlokal nach `~/.local/bin` verlinkt, wie `node` aus `~/.hermes/node/bin`.
-* Playwright 1.49.1 projektlokal (`package.json`, exakte Version). Die Host-Browser in
-  `~/.cache/ms-playwright` (1,1 GB) sind ohne Systembibliotheken nicht lauffähig und können
-  gelöscht werden.
-* Das alte Frontend lädt `supabase-js` vom CDN. Der Browser braucht dafür
-  Internetzugang. Die Datenzugriffe gehen trotzdem nur an `127.0.0.1`.
-
-Supabase-CLI 3.0.0 ist vorhanden.
+* `npm`/`npx` benutzerlokal in `~/.local/bin` verlinkt, aus `~/.hermes/node/bin`.
+* Playwright 1.49.1 projektlokal. Die Browser laufen im Docker-Image. Die Host-Browser
+  in `~/.cache/ms-playwright` (1,1 GB) sind ohne Systembibliotheken nicht nutzbar
+  und können gelöscht werden.
+* Das Frontend lädt `supabase-js`, ExcelJS und jsPDF vom CDN (mit SRI). Der
+  Browser-Container braucht dafür Internet; Datenzugriffe gehen nur an `127.0.0.1`.

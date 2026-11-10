@@ -1,12 +1,15 @@
 -- Normalisierter Katalogauszug (Rechte, Policies, Trigger, Funktionen, Schemas)
 -- für Vorher/Nachher-Vergleiche in der Testumgebung. Liest nur Katalogdaten.
 -- Aufruf mit psql -v bereich=alle|sr  (sr = nur Objekte außerhalb der
--- Spielplan-Tabellen, z. B. SR-Anwendung)
+-- Spielplan-Tabellen und Spielplan-Serverfunktionen, z. B. SR-Anwendung)
 \pset format unaligned
 \pset tuples_only on
 with app(t) as (values ('vereine'),('mannschaften'),('spieler'),('spieltermine'),
   ('alternativtermine'),('verfuegbarkeiten'),('nutzer_rollen'),('aufstellungen'),
   ('turnier_helfer'),('vereinsbefragung')),
+app_fn(f) as (values ('abfrage_laden'),('abfrage_antworten'),('abfrage_nachmelden'),('helfer_eintragen'),
+  ('oeffentlicher_spielplan'),('abfrage_link_erzeugen'),('abfrage_link_widerrufen'),('abfrage_links_liste'),
+  ('abfrage_token_erneuern'),('verschiebung_abschliessen'),('aufstellung_speichern'),('termine_importieren')),
 zeilen as (
   select 'acl' art, c.relname obj,
          coalesce((select string_agg(case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end
@@ -45,5 +48,6 @@ select art || ' ' || obj || ' = ' || inhalt
     or (art in ('acl','rls') and obj not in (select t from app))
     or (art = 'pol' and split_part(obj, ':', 1) not in (select t from app))
     or (art = 'trg' and split_part(obj, ':', 1) not in (select t from app))
-    or (art = 'fn' and obj like 'public.%')
+    or (art = 'fn' and obj like 'public.%'
+        and split_part(substr(obj, 8), '(', 1) not in (select f from app_fn))
  order by 1;

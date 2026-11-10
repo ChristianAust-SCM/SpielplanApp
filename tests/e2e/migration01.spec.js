@@ -4,7 +4,9 @@
 // Nur synthetische Konten aus supabase/tests/_seed.sql + staging/seed_staging.sql.
 const { test, expect } = require('@playwright/test');
 
-const STUFE = process.env.STAGING_STUFE || 'ist';
+const STUFE_ROH = process.env.STAGING_STUFE || 'ist';
+// 'kompat' = altes Frontend gegen 01–05 (Übergangsphase): gleiche Erwartungen wie nach 01
+const STUFE = STUFE_ROH === 'kompat' ? '01' : STUFE_ROH;
 const API = process.env.STAGING_API_URL;
 const KEY = process.env.STAGING_ANON_KEY;
 const PASSWORT = 'staging-lokal-1';
@@ -13,7 +15,7 @@ const M2 = '00000000-0000-4000-c000-000000000002';
 const OHNE = '00000000-0000-4000-a000-0000000000c1';
 const MF1 = '00000000-0000-4000-a000-0000000000b1';
 
-test.skip(!['ist', '01'].includes(STUFE), 'Datei gilt für Stufen ist und 01');
+test.skip(!['ist', '01'].includes(STUFE), 'Datei gilt für Stufen ist, 01 und kompat');
 if (!API || !API.startsWith('http://127.0.0.1')) throw new Error('Nur gegen lokalen Stack (STAGING_API_URL)');
 
 async function anmelden(page, email) {
@@ -55,7 +57,7 @@ test.afterEach(() => {
   expect(produktivAnfragen, 'Browser darf Produktion nie ansprechen').toEqual([]);
 });
 
-test.describe(`Altes Frontend · Stufe ${STUFE}`, () => {
+test.describe(`Altes Frontend · Stufe ${STUFE_ROH}`, () => {
   test('MF-Anmeldung zeigt genau die eigene Mannschaft', async ({ page }) => {
     await anmelden(page, 'mf1@test.invalid');
     await expect(page.locator('#tabs .tab')).toHaveCount(1);

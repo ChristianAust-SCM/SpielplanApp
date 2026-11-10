@@ -106,6 +106,7 @@ snapshot alle vorher_alle.txt
 snapshot sr   vorher_sr.txt
 anwenden "$ROOT/supabase/migrations/20261110000100_sicherheit_rollen_und_hilfsfunktionen.sql"
 snapshot sr   nach01_sr.txt
+snapshot alle nach01_alle.txt
 vergleiche vorher_sr.txt nach01_sr.txt "Migration 01 ändert nichts außerhalb der Spielplan-Tabellen (SR-Platzhalter, public-Funktionen)"
 testen "$ROOT/supabase/tests/20_rollen.sql"
 testen "$ROOT/supabase/tests/90_migration01_allein.sql"
@@ -116,7 +117,6 @@ anwenden "$ROOT/supabase/rollback/R01_rollen_policies_wiederherstellen.sql"
 snapshot alle nachR01_alle.txt
 vergleiche vorher_alle.txt nachR01_alle.txt "Rückfall R01 stellt den Katalog-Ausgangszustand exakt wieder her"
 for t in "$ROOT"/supabase/tests/1[0-9]_*.sql; do testen "$t"; done
-rm -rf "$SNAP_DIR"
 
 echo "▶ Stufe 2: Migrationen 01–05"
 for m in "$ROOT"/supabase/migrations/2026111000010*.sql "$ROOT"/supabase/migrations/2026111000020*.sql \
@@ -136,9 +136,25 @@ else
   echo "  ✓ R01 verweigert sich, sobald Migration 02 angewendet ist"
 fi
 
+echo "▶ Stufe 2b: Rückfall R02–05 → Zustand „nur 01“, danach 02–05 erneut"
+anwenden "$ROOT/supabase/rollback/R02_05_nur_migration01_wiederherstellen.sql"
+snapshot alle nachR0205_alle.txt
+vergleiche nach01_alle.txt nachR0205_alle.txt "R02–05 stellt den Katalogzustand nach Migration 01 exakt wieder her"
+testen "$ROOT/supabase/tests/90_migration01_allein.sql"
+testen "$ROOT/supabase/tests/20_rollen.sql"
+for m in 2026111000020 2026111000030 2026111000040 2026111000050; do
+  anwenden "$(ls "$ROOT"/supabase/migrations/${m}*.sql)"
+done
+for t in "$ROOT"/supabase/tests/[2-7][0-9]_*.sql; do testen "$t"; done
+
 echo "▶ Stufe 3: Migration 09 (anonymer Tabellenzugriff entzogen)"
 anwenden "$ROOT/supabase/migrations/20261110000900_anon_tabellenzugriff_entziehen.sql"
 for t in "$ROOT"/supabase/tests/8[0-9]_*.sql "$ROOT"/supabase/tests/4[0-9]_*.sql; do testen "$t"; done
+if "${PSQL[@]}" -f "$ROOT/supabase/rollback/R02_05_nur_migration01_wiederherstellen.sql" >/dev/null 2>&1; then
+  echo "  ✗ R02–05 lief trotz angewendeter Migration 09 durch"; FEHLER=$((FEHLER+1))
+else
+  echo "  ✓ R02–05 verweigert sich, solange Migration 09 angewendet ist"
+fi
 
 echo "▶ Stufe 4: Rückfall R09 und erneute Migration 09"
 anwenden "$ROOT/supabase/rollback/R09_anon_altpfad_wiederherstellen.sql"
@@ -146,6 +162,7 @@ testen "$ROOT/supabase/tests/70_altpfad_kompatibel.sql"
 anwenden "$ROOT/supabase/migrations/20261110000900_anon_tabellenzugriff_entziehen.sql"
 testen "$ROOT/supabase/tests/80_anon_entzogen.sql"
 
+rm -rf "$SNAP_DIR"
 echo
 if [ "$FEHLER" -gt 0 ]; then
   echo "✗ Datenbanktests: $FEHLER Testdatei(en) fehlgeschlagen"; exit 1

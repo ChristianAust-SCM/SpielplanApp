@@ -37,14 +37,16 @@ Rollenwechsel wie bei PostgREST: `SET LOCAL ROLE anon|authenticated` und
 
 `npm run test:alle` muss grün sein. Das Ergebnis gehört in die PR-Beschreibung.
 
-## Bekannte Lücken (nächste Schritte)
+## Staging (echter Stack + Browser)
 
-* **T1 – echter PostgREST/Supabase-Stack**: Die DB-Tests simulieren die
-  Rollen per SQL. PostgREST-spezifisches Verhalten (Upsert-Erzeugung des alten
-  Frontends, Embeds `mannschaften(...)`, RPC-Parameterübergabe) ist damit nicht
-  Ende-zu-Ende geprüft. Empfehlung: `supabase start` in einer isolierten
-  Umgebung oder ein Supabase-Branch, danach ein Browser-Smoke-Test (Playwright)
-  gegen diesen Stack.
-* **T2 – echte Browser**: jsdom statt Chromium/WebKit. Mobile Darstellung und
-  Zwischenablage auf iOS/Android nur manuell prüfbar.
-* **T3 – Exporte**: Excel/PDF werden nicht automatisiert erzeugt (CDN-Bibliotheken).
+`scripts/staging.sh lauf01` und `scripts/staging.sh laufrollout`: siehe `docs/STAGING.md`.
+Damit sind die früheren Lücken T1 (echter PostgREST/GoTrue-Stack) und T2 (Chromium und
+WebKit iPhone) geschlossen, ebenso T3 (Exporte: PDF und Excel werden erzeugt und als
+Download geprüft).
+
+## Verbleibende Lücken
+
+* Echte Endgeräte (iOS/Android) und das Öffnen der WhatsApp-App: nur manuell
+  bei der Funktionsprobe nach dem Frontend-Rollout.
+* Die Staging-DB ist die Baseline mit synthetischen Daten. Die Produktionsstruktur
+  ist per Vorabprüfung abgeglichen, die Produktionsdaten werden nie kopiert.

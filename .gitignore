@@ -16,3 +16,4 @@ test-results/
 playwright-report/
 supabase/.temp/
 staging/supabase/.branches/
+staging/.laufzeit.env

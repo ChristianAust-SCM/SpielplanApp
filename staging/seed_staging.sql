@@ -27,3 +27,8 @@ select gen_random_uuid(), u.id, u.id::text,
   from auth.users u
  where u.email like '%@test.invalid'
    and not exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email');
+
+-- Admin-Konto wie produktiv: Admin-Rolle für jede Mannschaft (Muster laut Vorabprüfung)
+insert into public.nutzer_rollen (user_id, mannschaft_id, rolle)
+select '00000000-0000-4000-a000-0000000000a1', m.id, 'admin' from public.mannschaften m
+on conflict (user_id, mannschaft_id) do nothing;

@@ -4,7 +4,7 @@
 begin;
 select plan(19);
 
-select ok(to_regclass('private.abfrage_links') is null, 'Vorbedingung: Migration 02 ist nicht angewendet');
+select ok(to_regprocedure('public.abfrage_laden(text)') is null, 'Vorbedingung: Serverfunktionen aus 02 nicht vorhanden');
 
 -- Anmeldung (app.js: nutzer_rollen + Embed mannschaften, nur eigene Zeilen)
 :als_mf1
