@@ -7,8 +7,9 @@
 -- Quellen:
 --   * Read-only-Strukturaudit vom 09.11.2026 (Policies, Grants, Constraints,
 --     Indizes, Trigger) – ausschließlich Katalogdaten, keine Inhalte.
---   * Spaltenliste aus dem Anwendungscode abgeleitet (das Audit enthielt keine
---     Spaltenliste). Abweichungen sind möglich, siehe docs/SICHERHEITSMODELL.md.
+--   * Spaltenliste: ursprünglich aus dem Code abgeleitet, am 10.11.2026 mit der
+--     produktiven Vorabprüfung (information_schema.columns) abgeglichen.
+--     Unbekannt bleiben nur exakte Default-Werte und Array-Elementtypen.
 --
 -- Bewusst NACHGEBILDET (damit Tests den Ist-Zustand als unsicher nachweisen):
 --   * offene SELECT-Policies "using (true)" für die Rolle public
@@ -35,7 +36,8 @@ create table public.mannschaften (
   liga text not null,
   mf_name text,
   mf_email text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  min_spieler integer default 6   -- produktiv vorhanden (Vorabprüfung 10.11.2026), nullable
 );
 
 create table public.spieler (
@@ -93,17 +95,17 @@ create table public.nutzer_rollen (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
   mannschaft_id uuid references public.mannschaften(id) on delete cascade,
-  rolle text constraint nutzer_rollen_rolle_check check (rolle = any (array['admin','mf'])),
+  rolle text default 'mf' constraint nutzer_rollen_rolle_check check (rolle = any (array['admin','mf'])),
   created_at timestamptz default now(),
   unique (user_id, mannschaft_id)
 );
 
 create table public.aufstellungen (
   id uuid primary key default gen_random_uuid(),
-  spieltermin_id uuid references public.spieltermine(id) on delete cascade,
+  spieltermin_id uuid not null references public.spieltermine(id) on delete cascade,
   spieler_id uuid references public.spieler(id) on delete cascade,
+  erstellt_am timestamptz default now(),
   ersatz_mannschaft_id uuid references public.mannschaften(id),
-  created_at timestamptz default now(),
   constraint aufstellungen_spieler_oder_ersatz_chk check (
     (spieler_id is not null and ersatz_mannschaft_id is null) or
     (spieler_id is null and ersatz_mannschaft_id is not null)),
@@ -114,16 +116,26 @@ create index idx_aufstellungen_spieltermin on public.aufstellungen (spieltermin_
 create table public.turnier_helfer (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  einsatz text constraint turnier_helfer_einsatz_check check (einsatz = any (array['aufbau','turnier','beides'])),
-  anmerkung text,
-  created_at timestamptz default now()
+  einsatz text not null constraint turnier_helfer_einsatz_check check (einsatz = any (array['aufbau','turnier','beides'])),
+  created_at timestamptz not null default now(),
+  anmerkung text
 );
 
--- Spalten produktiv unbekannt (Tabelle wird im Repository-Code nicht genutzt)
+-- Spalten laut Vorabprüfung 10.11.2026 (Tabelle wird im Repository-Code nicht genutzt;
+-- Array-Elementtyp nicht ausgegeben, text[] angenommen)
 create table public.vereinsbefragung (
   id uuid primary key default gen_random_uuid(),
-  daten jsonb,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  abteilungen text[],
+  anzahl_mannschaften text,
+  zeitfresser text[],
+  kommunikation text[],
+  whatsapp_freitext text,
+  mytischtennis_erlebnis text,
+  tt_wunsch text,
+  eine_sache text,
+  email_opt text,
+  app_name text
 );
 
 -- ---------------------------------------------------------------------------

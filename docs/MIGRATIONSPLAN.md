@@ -11,6 +11,7 @@ eine eigene ausdrückliche Freigabe von Christian.
 | `20261110000200_spielerlinks_und_serverfunktionen.sql` | Spalten `min_spieler`, `saison` (generiert), `nachgemeldet_am`; Unique-Index Alternativtermine; `private.einstellungen`, `private.abfrage_links`; RPCs; Integritäts-Trigger | ja | additiv; Funktionen/Trigger droppen |
 | `20261110000300_rls_mannschaftsgrenzen.sql` | Policies neu: MF je Mannschaft, Admin global; anon-Altpfad spalten- und zeilenweise begrenzt | ja (getestet in `70_altpfad_kompatibel.sql`) | Gegenmigration mit Baseline-Policies (nur im Notfall) |
 | `20261110000400_rueckrunde_terminimport.sql` | `termine_importieren` (Vorschau + transaktionaler Import) | ja | Funktion droppen |
+| `20261110000500_mannschaftsstaerken.sql` | Mindeststärken 1./2./3. Mannschaft = 6/6/4 (nach 02) | ja | Werte per UPDATE zurück |
 | `20261110000900_anon_tabellenzugriff_entziehen.sql` | anon nur noch RPCs | **nein**, braucht das neue Frontend | `supabase/rollback/R09_anon_altpfad_wiederherstellen.sql` |
 
 ## 2. Reihenfolge

@@ -118,15 +118,17 @@ vergleiche vorher_alle.txt nachR01_alle.txt "Rückfall R01 stellt den Katalog-Au
 for t in "$ROOT"/supabase/tests/1[0-9]_*.sql; do testen "$t"; done
 rm -rf "$SNAP_DIR"
 
-echo "▶ Stufe 2: Migrationen 01–04"
+echo "▶ Stufe 2: Migrationen 01–05"
 for m in "$ROOT"/supabase/migrations/2026111000010*.sql "$ROOT"/supabase/migrations/2026111000020*.sql \
-         "$ROOT"/supabase/migrations/2026111000030*.sql "$ROOT"/supabase/migrations/2026111000040*.sql; do
+         "$ROOT"/supabase/migrations/2026111000030*.sql "$ROOT"/supabase/migrations/2026111000040*.sql \
+         "$ROOT"/supabase/migrations/2026111000050*.sql; do
   anwenden "$m"
 done
-echo "  · Idempotenz: Migrationen 01, 02, 04 erneut"
+echo "  · Idempotenz: Migrationen 01, 02, 04, 05 erneut"
 anwenden "$ROOT/supabase/migrations/20261110000100_sicherheit_rollen_und_hilfsfunktionen.sql"
 anwenden "$ROOT/supabase/migrations/20261110000200_spielerlinks_und_serverfunktionen.sql"
 anwenden "$ROOT/supabase/migrations/20261110000400_rueckrunde_terminimport.sql"
+anwenden "$ROOT/supabase/migrations/20261110000500_mannschaftsstaerken.sql"
 for t in "$ROOT"/supabase/tests/[2-7][0-9]_*.sql; do testen "$t"; done
 if "${PSQL[@]}" -f "$ROOT/supabase/rollback/R01_rollen_policies_wiederherstellen.sql" >/dev/null 2>&1; then
   echo "  ✗ R01 lief trotz angewendeter Migration 02 durch"; FEHLER=$((FEHLER+1))

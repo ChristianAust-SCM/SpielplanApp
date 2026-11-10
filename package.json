@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "test:db": "bash scripts/db-test.sh",
-    "test:alle": "npm test && npm run test:db"
+    "test:alle": "npm test && npm run test:db",
+    "test:staging01": "bash scripts/staging.sh lauf01"
   },
   "devDependencies": {
     "jsdom": "25.0.1"

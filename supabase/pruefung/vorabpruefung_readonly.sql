@@ -54,8 +54,9 @@ union all
 select 'alternativtermine', count(*) filter (where abfrage_token !~ '^[A-Za-z0-9_-]{16,128}$')
   from public.alternativtermine;
 
--- 8. Mannschaftsstärken (falls Spalte existiert – sonst Fehler, dann entfällt Abfrage)
--- select name, min_spieler from public.mannschaften order by name;
+-- 8. Mannschaftsstärken (Spalte existiert produktiv laut Vorabprüfung 10.11.2026;
+--    Werte außerhalb 1–12 würden Migration 02 abbrechen)
+select name, min_spieler from public.mannschaften order by name;
 
 -- 9. Trigger auf App-Tabellen (Konflikte mit neuen Triggern)
 select event_object_table, trigger_name from information_schema.triggers
