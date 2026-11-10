@@ -103,3 +103,122 @@ test('Zusatz · Spielplanübersicht auf dem Smartphone', async ({ playwright }) 
   await page.screenshot({ path: `${OUT}/4_uebersicht_mobil.png`, fullPage: true });
   await b.close();
 });
+
+// ============================================================================
+// Vollständige Oberfläche (zweite Abnahme)
+// ============================================================================
+const DESKTOP = { viewport: { width: 1600, height: 1000 } };
+async function seite(browser, opts) {
+  const context = await browser.newContext({ ...(opts || DESKTOP), locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  const fremd = await schutz(context); const page = await context.newPage();
+  page.on('dialog', d => d.dismiss());
+  return { context, page, fremd };
+}
+const zeile = (page, g) => page.locator('#table-container tbody tr', { hasText: g });
+
+test('5 · Login (Desktop)', async ({ browser }) => {
+  const { context, page, fremd } = await seite(browser);
+  await page.goto('/login.html');
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('#btn-login')).toBeVisible();
+  await page.screenshot({ path: `${OUT}/5_login.png` });
+  await page.click('#btn-login');
+  await expect(page.locator('.error-msg')).toContainText('Bitte E-Mail und Passwort eingeben.');
+  await page.screenshot({ path: `${OUT}/5b_login_hinweis.png` });
+  expect(fremd).toEqual([]);
+  await context.close();
+});
+
+test('6 · Aufstellung (Desktop)', async ({ browser }) => {
+  const { context, page } = await seite(browser);
+  await anmelden(page, 'mf1@test.invalid');
+  await zeile(page, 'TSV Holzheim').locator('button[aria-label="Aufstellung"]').click();
+  const modal = page.locator('.sp-modal');
+  const boxen = modal.locator('.auf-check:not(.auf-check-ersatz)');
+  await expect(boxen).toHaveCount(7);                                  // 6 Ja + 1 Vielleicht
+  for (let i = 0; i < 6; i++) await boxen.nth(i).check();
+  await expect(modal.locator('#auf-counter')).toHaveText('6 / 6');
+  await expect(modal.locator('#auf-save')).toBeEnabled();
+  await page.screenshot({ path: `${OUT}/6_aufstellung.png` });
+  await context.close();
+});
+
+test('7 · Verschiebung durch den Mannschaftsführer (Desktop)', async ({ browser }) => {
+  const { context, page } = await seite(browser);
+  await anmelden(page, 'mf1@test.invalid');
+  await zeile(page, 'TT Griesingen').locator('button[aria-label="Verlegung prüfen"]').click();
+  const modal = page.locator('.sp-modal');
+  await expect(modal.locator('#alt-liste')).toContainText('Alternative 2');
+  await expect(modal.locator('button', { hasText: 'Termin hinzufügen' })).toBeVisible();
+  await expect(modal.locator('button', { hasText: 'Verschiebungsbedarf beim Admin melden' })).toBeVisible();
+  await page.screenshot({ path: `${OUT}/7_verschiebung_mf.png` });
+  await context.close();
+});
+
+test('8 · Verschiebung bestätigen durch den Admin (Desktop)', async ({ browser }) => {
+  const { context, page } = await seite(browser);
+  await anmelden(page, 'admin@test.invalid');
+  await zeile(page, 'TT Griesingen').locator('button[aria-label="Alternativtermin"]').click();
+  const modal = page.locator('.sp-modal');
+  await expect(modal).toContainText('6 Ja');
+  await expect(modal.locator('button', { hasText: 'Diesen Termin als neuen Spieltermin bestätigen' })).toHaveCount(2);
+  await expect(modal.locator('button', { hasText: 'Eigenen Termin bestätigen' })).toBeVisible();
+  await page.screenshot({ path: `${OUT}/8_verschiebung_admin.png` });
+  await context.close();
+});
+
+test('9 · CSV-Import mit Vorschau (Desktop)', async ({ browser }) => {
+  // Beispieldatei: Gegner der Vorrunde mit getauschtem Heimrecht; Daten nur zur Vorschau, nicht gespeichert
+  const csv = 'Mannschaft;Datum;Uhrzeit;Heim/Auswärts;Gegner;Ort;Spieltag\n' +
+    '1. Mannschaft;16.01.2027;18:30;A;TSV Erbach;;10\n' +
+    '1. Mannschaft;24.01.2027;14:30;H;TT Steinheim-Zang (SG);;11\n' +
+    '1. Mannschaft;30.01.2027;18:00;H;TT Griesingen-Rißtissen (SG);;12\n';
+  const { context, page } = await seite(browser);
+  await anmelden(page, 'admin@test.invalid');
+  await page.locator('#runde-umschalter button', { hasText: 'importieren' }).click();
+  await page.setInputFiles('#import-datei', { name: 'rueckrunde_beispiel.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.locator('.sp-modal button', { hasText: 'Prüfen' }).click();
+  await expect(page.locator('#import-vorschau')).toContainText('3 Zeilen · 3 gültig · 0 mit Fehlern');
+  await expect(page.locator('#import-vorschau button', { hasText: 'Termine jetzt importieren' })).toBeVisible();
+  await page.screenshot({ path: `${OUT}/9_import.png` });
+  await context.close();
+});
+
+test('10 · Export-Auswahl (Desktop)', async ({ browser }) => {
+  const { context, page } = await seite(browser);
+  await anmelden(page, 'mf1@test.invalid');
+  await page.click('#btn-export');
+  await expect(page.locator('#export-menu-overlay .exp-gruppe')).toHaveCount(2);
+  await page.screenshot({ path: `${OUT}/10_export.png` });
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }),
+    page.locator('#export-menu-overlay .exp-gruppe').nth(0).locator('button', { hasText: 'Excel' }).click()]);
+  expect(dl.suggestedFilename()).toMatch(/\.xlsx$/);
+  await expect(page.locator('#btn-export')).toHaveText(/Export/);           // Kopfknopf wieder hergestellt
+  await context.close();
+});
+
+test('11 · Smartphone: Karten, Detail, Aufstellung, Login', async ({ playwright }) => {
+  const b = await playwright.webkit.launch();
+  const { context, page, fremd } = await seite(b, { ...devices['iPhone 13'] });
+  await page.goto('/login.html');
+  await page.evaluate(() => document.fonts.ready);
+  await keinQuerscrollen(page);
+  await page.screenshot({ path: `${OUT}/11a_login_mobil.png` });
+  await anmelden(page, 'admin@test.invalid');
+  await keinQuerscrollen(page);
+  await expect(page.locator('tr.zeile-kritisch')).toBeVisible();
+  await page.screenshot({ path: `${OUT}/11b_uebersicht_mobil.png`, fullPage: true });
+  await zeile(page, 'TT Griesingen').locator('td').nth(4).locator('button').click();
+  await expect(page.locator('.sp-modal')).toContainText('Noch keine Antwort (1)');
+  await page.screenshot({ path: `${OUT}/11c_detail_mobil.png` });
+  await page.locator('.sp-modal .mdl-zu, .sp-modal .dt-zu').first().click();
+  await zeile(page, 'TSV Holzheim').locator('button[aria-label="Aufstellung"]').click();
+  await expect(page.locator('#auf-save')).toBeVisible();
+  await page.screenshot({ path: `${OUT}/11d_aufstellung_mobil.png` });
+  await page.locator('.sp-modal .mdl-zu').click();
+  await zeile(page, 'TT Griesingen').locator('button[aria-label="Alternativtermin"]').click();
+  await expect(page.locator('#admin-datum')).toBeVisible();
+  await page.screenshot({ path: `${OUT}/11e_verschiebung_mobil.png` });
+  expect(fremd).toEqual([]);
+  await b.close();
+});

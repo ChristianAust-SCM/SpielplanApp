@@ -75,6 +75,27 @@ function modalOeffnen(innerHtml, maxBreite) {
 function modalSchliessen() {
   document.querySelectorAll('.sp-modal').forEach(m => m.remove());
 }
+// Einheitlicher Fensterrahmen. Alle Textwerte werden vom Aufrufer bereits mit esc() übergeben.
+function mdl(o) {
+  return '<div class="mdl" style="max-width:' + (o.breite || 520) + 'px">' +
+    '<div class="mdl-kopf">' + (o.sym || SYM.wappen()) +
+      '<div style="min-width:0">' +
+        (o.kicker ? '<div class="mdl-kicker">' + o.kicker + '</div>' : '') +
+        '<div class="mdl-titel">' + o.titel + '</div>' +
+        (o.unter ? '<div class="mdl-unter">' + o.unter + '</div>' : '') +
+      '</div>' +
+      '<button class="mdl-zu" onclick="this.closest(\'.sp-modal\').remove()" aria-label="Schließen">' + SYM.kreuz() + '</button>' +
+    '</div>' +
+    '<div class="mdl-inhalt">' + o.inhalt + '</div>' +
+    (o.fuss ? '<div class="mdl-fuss">' + o.fuss + '</div>' : '') +
+  '</div>';
+}
+function haPill(heim) { return '<span class="pill ' + (heim ? 'pill-heim' : 'pill-ausw') + '">' + (heim ? 'Heim' : 'Auswärts') + '</span>'; }
+function terminUnter(termin) {
+  return '<span>' + SYM.kalender() + esc(fmt(termin.datum, { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' })) + '</span>' +
+    (termin.uhrzeit ? '<span>' + SYM.uhr() + esc(uhr(termin.uhrzeit)) + ' Uhr</span>' : '') +
+    (aktiveMannschaft ? '<span>' + SYM.team() + esc(aktiveMannschaft.name) + '</span>' : '');
+}
 const X_BTN = '<button onclick="this.closest(\'.sp-modal\').remove()" aria-label="Schließen" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>';
 
 // Feste Symbole in die statische Seite einsetzen (nur Konstanten, keine Daten)
@@ -181,7 +202,7 @@ function renderRundenUmschalter() {
 
   const saisons = Array.from(new Set(alleTermineMannschaft.map(t => t.saison || SPRunde.saisonVon(t.datum)).filter(Boolean))).sort();
   const saisonAuswahl = saisons.length > 1
-    ? '<select id="saison-auswahl" onchange="setzeSaison(this.value)" aria-label="Saison" style="padding:7px 12px;border-radius:20px;border:1px solid var(--line);background:var(--navy2);color:var(--white);font-family:Calibri,sans-serif;font-size:14px">' +
+    ? '<select id="saison-auswahl" class="eingabe" onchange="setzeSaison(this.value)" aria-label="Saison" style="width:auto;border-radius:999px">' +
         saisons.map(s => '<option value="' + esc(s) + '"' + (s === aktiveSaison ? ' selected' : '') + '>Saison ' + esc(s) + '</option>').join('') +
       '</select>'
     : '';
@@ -502,7 +523,7 @@ async function meldeVerschiebung(terminId) {
 
 function altListeHtml(termin, liste) {
   if (!liste || liste.length === 0)
-    return '<div style="font-size:13px;color:#8996B4;font-style:italic">Noch keine Alternativtermine eingetragen.</div>';
+    return '<div class="mdl-hinweis">Noch keine Alternativtermine eingetragen.</div>';
   return liste.map(function(at, i) {
     const ad   = fmt(at.datum, { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
     const auhr = at.uhrzeit ? uhr(at.uhrzeit) + ' Uhr' : '';
@@ -510,16 +531,13 @@ function altListeHtml(termin, liste) {
       heim: termin.heim, gegner: termin.gegner, datumLang: ad, uhrzeit: auhr,
       link: altLink(at.abfrage_token), mfName: aktiveMannschaft && aktiveMannschaft.mf_name
     });
-    return '<div style="background:#1e3048;border-radius:8px;padding:12px 14px;display:grid;gap:8px;margin-bottom:8px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<div style="font-weight:700;color:#F7F9FF;font-size:14px">Alternative ' + (i+1) + ': ' + esc(ad) + (auhr ? ' · ' + esc(auhr) : '') + '</div>' +
-        '<button onclick="loescheAlternativtermin(\'' + uuidOderLeer(at.id) + '\')" style="background:none;border:none;color:#8996B4;cursor:pointer;font-size:16px" title="Löschen" aria-label="Alternativtermin löschen">🗑</button>' +
+    return '<div class="tafel" style="margin-bottom:8px">' +
+      '<div class="tafel-zeile">' +
+        '<div class="tafel-titel" style="margin:0">' + SYM.kalender() + 'Alternative ' + (i+1) + ': ' + esc(ad) + (auhr ? ' · ' + esc(auhr) : '') + '</div>' +
+        '<button class="knopf-symbol" onclick="loescheAlternativtermin(\'' + uuidOderLeer(at.id) + '\')" title="Löschen" aria-label="Alternativtermin löschen">' + SYM.loeschen() + '</button>' +
       '</div>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-        '<button onclick="kopierenWA(this,\'a:' + uuidOderLeer(at.id) + '\')" ' +
-          'style="padding:5px 10px;border-radius:6px;background:#25D366;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">' +
-          '💬 WhatsApp-Link kopieren' +
-        '</button>' +
+      '<div style="margin-top:10px">' +
+        '<button class="knopf knopf-wa knopf-klein" onclick="kopierenWA(this,\'a:' + uuidOderLeer(at.id) + '\')">' + SYM.whatsapp('sym-s') + 'WhatsApp-Link kopieren</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -528,46 +546,34 @@ function altListeHtml(termin, liste) {
 async function zeigeMFVerschiebungsModal(termin) {
   const altTermine = pruefe(await sb.from('alternativtermine')
     .select(SPALTEN.alt).eq('spieltermin_id', termin.id).order('datum'));
-  const d   = fmt(termin.datum, { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
   const tid = uuidOderLeer(termin.id);
   const bedarf = termin.status === 'Verschiebung nötig';
 
-  modalOeffnen(
-    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto">' +
-      '<div style="padding:18px 22px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232;z-index:1">' +
-        '<div>' +
-          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:16px;color:#F07830">Verschiebung – Alternativtermine</div>' +
-          '<div style="font-size:13px;color:#8996B4;margin-top:2px">' + (termin.heim?'Heimspiel':'Auswärtsspiel') + ' gegen ' + esc(termin.gegner) + ' · ' + esc(d) + '</div>' +
-        '</div>' + X_BTN +
+  modalOeffnen(mdl({
+    breite: 540,
+    sym: SYM.tausch(),
+    kicker: haPill(termin.heim) + '<span>Verschiebung · Alternativtermine</span>',
+    titel: esc(termin.gegner),
+    unter: terminUnter(termin),
+    inhalt:
+      (bedarf ? '<div class="dt-lage warn">' + SYM.warnung() + '<div><div class="dt-lage-titel">Verschiebungsbedarf gemeldet</div><div class="dt-lage-text">Der Admin sieht den Termin als „Verschiebung nötig“.</div></div></div>' : '') +
+      '<div>' +
+        '<div class="mdl-gruppe">Alternativtermine</div>' +
+        '<div id="alt-liste">' + altListeHtml(termin, altTermine) + '</div>' +
       '</div>' +
-      '<div style="padding:20px 22px;display:grid;gap:16px">' +
-        '<div>' +
-          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:10px">Alternativtermine</div>' +
-          '<div id="alt-liste">' + altListeHtml(termin, altTermine) + '</div>' +
+      '<div class="tafel tafel-akzent">' +
+        '<div class="tafel-titel">' + SYM.plus() + 'Alternativtermin hinzufügen</div>' +
+        '<div class="feld-raster">' +
+          '<div><label class="feld-label" for="alt-datum">Datum</label><input class="eingabe" type="date" id="alt-datum"></div>' +
+          '<div><label class="feld-label" for="alt-uhrzeit">Uhrzeit</label><input class="eingabe" type="time" id="alt-uhrzeit" value="14:30"></div>' +
         '</div>' +
-        '<div style="background:#1e3048;border-radius:8px;padding:14px">' +
-          '<div style="font-size:12px;font-weight:700;color:#1D9E75;margin-bottom:10px">+ Alternativtermin hinzufügen</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
-            '<div>' +
-              '<label for="alt-datum" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:6px">Datum</label>' +
-              '<input type="date" id="alt-datum" style="width:100%;padding:9px 12px;background:#0D1B2A;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:13px;outline:none">' +
-            '</div>' +
-            '<div>' +
-              '<label for="alt-uhrzeit" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:6px">Uhrzeit</label>' +
-              '<input type="time" id="alt-uhrzeit" value="14:30" style="width:100%;padding:9px 12px;background:#0D1B2A;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:13px;outline:none">' +
-            '</div>' +
-          '</div>' +
-          '<button onclick="speichereAlternativtermin(\'' + tid + '\', this)" style="width:100%;margin-top:12px;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">Termin hinzufügen</button>' +
-        '</div>' +
-        '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">' +
-          '<button onclick="meldeVerschiebungsBedarf(\'' + tid + '\')" style="width:100%;padding:10px;background:' +
-            (bedarf ? 'rgba(212,98,10,0.3)' : 'rgba(212,98,10,0.15)') +
-            ';color:#F07830;border:1px solid rgba(212,98,10,0.35);border-radius:8px;font-family:Calibri,sans-serif;font-size:14px;font-weight:700;cursor:pointer">' +
-            (bedarf ? '⚠️ Verschiebungsbedarf zurückziehen' : '↔️ Verschiebungsbedarf beim Admin melden') +
-          '</button>' +
-        '</div>' +
-      '</div>' +
-    '</div>');
+        '<button class="knopf knopf-akzent knopf-voll" style="margin-top:12px" onclick="speichereAlternativtermin(\'' + tid + '\', this)">Termin hinzufügen</button>' +
+      '</div>',
+    fuss:
+      '<button class="knopf ' + (bedarf ? 'knopf-still' : 'knopf-gefahr') + ' knopf-voll" onclick="meldeVerschiebungsBedarf(\'' + tid + '\')">' +
+        (bedarf ? SYM.kreuz('sym-s') + 'Verschiebungsbedarf zurückziehen' : SYM.flagge('sym-s') + 'Verschiebungsbedarf beim Admin melden') +
+      '</button>'
+  }));
 }
 
 async function speichereAlternativtermin(terminId, btn) {
@@ -636,7 +642,6 @@ async function zeigeAdminVerschiebungsModal(termin) {
     at._nein = g.filter(v => v.antwort === 'Nein').length;
   });
 
-  const d   = fmt(termin.datum, { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
   const tid = uuidOderLeer(termin.id);
   const min = minSpieler();
 
@@ -644,44 +649,40 @@ async function zeigeAdminVerschiebungsModal(termin) {
     ? altTermine.map(function(at, i) {
         const ad = fmt(at.datum, { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
         const auhr = at.uhrzeit ? uhr(at.uhrzeit) + ' Uhr' : '';
-        return '<div style="background:#1e3048;border-radius:10px;padding:14px 16px;border:1px solid rgba(255,255,255,0.08)">' +
-          '<div style="font-weight:700;color:#F7F9FF;font-size:14px;margin-bottom:6px">Alternative ' + (i+1) + ': ' + esc(ad) + (auhr ? ' · ' + esc(auhr) : '') + '</div>' +
-          '<div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">' +
-            '<span style="background:rgba(29,158,117,0.15);color:#4FD4A8;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._ja + ' Ja</span>' +
-            '<span style="background:rgba(240,180,41,0.12);color:#F0C060;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._vielleicht + ' Vielleicht</span>' +
-            '<span style="background:rgba(226,75,74,0.12);color:#F08080;padding:3px 10px;border-radius:12px;font-size:13px;font-weight:700">' + at._nein + ' Nein</span>' +
-            (at._ja >= min ? '' : '<span style="color:#8996B4;font-size:12px;align-self:center">(min. ' + min + ' Ja nötig)</span>') +
+        const genug = at._ja >= min;
+        return '<div class="tafel"' + (genug ? ' style="border-color:rgba(47,207,143,0.45)"' : '') + '>' +
+          '<div class="tafel-titel">' + SYM.kalender() + 'Alternative ' + (i+1) + ': ' + esc(ad) + (auhr ? ' · ' + esc(auhr) : '') + '</div>' +
+          '<div class="badges" style="flex-wrap:wrap;margin-bottom:12px;align-items:center">' +
+            '<span class="pill pill-ja"><span class="pill-punkt"></span>' + at._ja + ' Ja</span>' +
+            '<span class="pill pill-viel"><span class="pill-punkt"></span>' + at._vielleicht + ' Vielleicht</span>' +
+            '<span class="pill pill-nein"><span class="pill-punkt"></span>' + at._nein + ' Nein</span>' +
+            (genug ? '' : '<span style="color:var(--muted);font-size:13px">(min. ' + min + ' Ja nötig)</span>') +
           '</div>' +
-          '<button onclick="bestaetigeAlternativtermin(\'' + tid + '\',\'' + uuidOderLeer(at.id) + '\')" ' +
-            'style="width:100%;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">' +
-            '✓ Diesen Termin als neuen Spieltermin bestätigen' +
+          '<button class="knopf knopf-gruen knopf-voll" onclick="bestaetigeAlternativtermin(\'' + tid + '\',\'' + uuidOderLeer(at.id) + '\')">' +
+            SYM.haken('sym-s') + 'Diesen Termin als neuen Spieltermin bestätigen' +
           '</button>' +
         '</div>';
       }).join('')
-    : '<div style="font-size:13px;color:#8996B4;font-style:italic">Noch keine Alternativtermine vom MF eingetragen.</div>';
+    : '<div class="mdl-hinweis">Noch keine Alternativtermine vom MF eingetragen.</div>';
 
   // Admin kann ebenfalls Alternativtermine anlegen (wie der MF)
-  modalOeffnen(
-    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto">' +
-      '<div style="padding:18px 22px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232">' +
-        '<div>' +
-          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:16px;color:#F07830">Admin – Verschiebung bestätigen</div>' +
-          '<div style="font-size:13px;color:#8996B4;margin-top:2px">' + (termin.heim?'Heimspiel':'Auswärtsspiel') + ' gegen ' + esc(termin.gegner) + ' · ' + esc(d) + '</div>' +
-        '</div>' + X_BTN +
-      '</div>' +
-      '<div style="padding:20px 22px;display:grid;gap:14px">' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4">Abstimmungsergebnisse</div>' +
-        altHtml +
-        '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:14px">' +
-          '<div style="font-size:12px;color:#8996B4;margin-bottom:10px;font-weight:700">Oder: Eigenen Termin eintragen</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
-            '<input type="date" id="admin-datum" aria-label="Datum" style="padding:9px 12px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:13px;outline:none">' +
-            '<input type="time" id="admin-uhrzeit" aria-label="Uhrzeit" value="14:30" style="padding:9px 12px;background:#1e3048;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#F7F9FF;font-family:Calibri,sans-serif;font-size:13px;outline:none">' +
-          '</div>' +
-          '<button onclick="bestaetigeEigenerTermin(\'' + tid + '\')" style="width:100%;margin-top:10px;padding:10px;background:#D4620A;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">Eigenen Termin bestätigen</button>' +
+  modalOeffnen(mdl({
+    breite: 560,
+    sym: SYM.tausch(),
+    kicker: haPill(termin.heim) + '<span>Admin · Verschiebung bestätigen</span>',
+    titel: esc(termin.gegner),
+    unter: terminUnter(termin),
+    inhalt:
+      '<div><div class="mdl-gruppe">Abstimmungsergebnisse</div><div style="display:grid;gap:10px">' + altHtml + '</div></div>' +
+      '<div class="tafel tafel-akzent">' +
+        '<div class="tafel-titel">' + SYM.kalender() + 'Oder: Eigenen Termin eintragen</div>' +
+        '<div class="feld-raster">' +
+          '<div><label class="feld-label" for="admin-datum">Datum</label><input class="eingabe" type="date" id="admin-datum" aria-label="Datum"></div>' +
+          '<div><label class="feld-label" for="admin-uhrzeit">Uhrzeit</label><input class="eingabe" type="time" id="admin-uhrzeit" aria-label="Uhrzeit" value="14:30"></div>' +
         '</div>' +
-      '</div>' +
-    '</div>');
+        '<button class="knopf knopf-akzent knopf-voll" style="margin-top:12px" onclick="bestaetigeEigenerTermin(\'' + tid + '\')">Eigenen Termin bestätigen</button>' +
+      '</div>'
+  }));
 }
 
 async function bestaetigeAlternativtermin(terminId, altId) {
@@ -737,10 +738,10 @@ function zeigeAufstellung(terminId) {
   ).length;
 
   function ersatzRowHtml() {
-    return '<div class="auf-ersatz-row" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(212,98,10,0.12);border:1px solid rgba(212,98,10,0.3);border-radius:8px;margin-bottom:6px">' +
-      '<input type="checkbox" class="auf-check auf-check-ersatz" checked disabled style="width:18px;height:18px;accent-color:#D4620A;flex-shrink:0">' +
-      '<span style="flex:1;font-size:14px;color:#F07830;font-weight:700">Ersatz · 3. Mannschaft</span>' +
-      '<button type="button" class="auf-ersatz-entfernen" title="Entfernen" aria-label="Ersatz entfernen" style="background:none;border:none;color:#8996B4;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px">✕</button>' +
+    return '<div class="auf-ersatz-row wahl-zeile wahl-ersatz">' +
+      '<input type="checkbox" class="auf-check auf-check-ersatz" checked disabled>' +
+      '<span class="wahl-name">Ersatz · 3. Mannschaft</span>' +
+      '<button type="button" class="auf-ersatz-entfernen knopf-symbol" title="Entfernen" aria-label="Ersatz entfernen">' + SYM.kreuz() + '</button>' +
     '</div>';
   }
 
@@ -760,51 +761,41 @@ function zeigeAufstellung(terminId) {
     alleAufstellungen.filter(a => a.spieltermin_id === terminId).map(a => a.spieler_id)
   );
 
-  const d = fmt(termin.datum, { weekday:'long', day:'2-digit', month:'2-digit' }) +
-            (termin.uhrzeit ? ' · ' + uhr(termin.uhrzeit) + ' Uhr' : '');
-  const titel = 'Aufstellung · ' + (termin.heim?'Heim':'Auswärts') + ' gegen ' + termin.gegner;
-
   function spielerRow(s) {
     const a = antwortVon(s.id);
-    const antFarbe = a === 'Ja' ? '#4FD4A8' : '#F0C060';
     const checked = gesetzt.has(s.id) ? 'checked' : '';
-    return '<label class="auf-row" style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:#1e3048;border-radius:8px;margin-bottom:6px;cursor:pointer">' +
-      '<input type="checkbox" class="auf-check" value="' + esc(s.id) + '" ' + checked + ' style="width:18px;height:18px;accent-color:#1D9E75;cursor:pointer;flex-shrink:0">' +
-      '<span style="font-family:IBM Plex Mono,monospace;font-size:12px;font-weight:700;color:#F07830;min-width:26px">' + esc(posLabel(s)) + '</span>' +
-      '<span style="flex:1;font-size:14px;color:#F7F9FF">' + esc(SPS.anzeigeName(s.name)) + '</span>' +
-      '<span style="font-size:11px;font-weight:700;color:' + antFarbe + '">' + esc(a) + '</span>' +
-      (s.ttr != null ? '<span style="font-size:11px;color:#8996B4;font-family:monospace;min-width:34px;text-align:right">' + esc(s.ttr) + '</span>' : '<span style="min-width:34px"></span>') +
+    return '<label class="auf-row wahl-zeile">' +
+      '<input type="checkbox" class="auf-check" value="' + esc(s.id) + '" ' + checked + '>' +
+      '<span class="wahl-pos">' + esc(posLabel(s)) + '</span>' +
+      '<span class="wahl-name">' + esc(SPS.anzeigeName(s.name)) + '</span>' +
+      '<span class="pill pill-k ' + (a === 'Ja' ? 'pill-ja' : 'pill-viel') + '"><span class="pill-punkt"></span>' + esc(a) + '</span>' +
+      '<span class="wahl-ttr">' + (s.ttr != null ? esc(s.ttr) : '') + '</span>' +
     '</label>';
   }
 
   const listeHtml = waehlbar.length === 0
-    ? '<div style="font-size:13px;color:#8996B4;padding:16px 0;text-align:center">Noch keine Ja/Vielleicht-Zusagen für diesen Spieltag.</div>'
+    ? '<div class="mdl-hinweis" style="text-align:center;padding:14px 0">Noch keine Ja/Vielleicht-Zusagen für diesen Spieltag.</div>'
     : waehlbar.map(spielerRow).join('');
 
-  const modal = modalOeffnen(
-    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:500px;width:100%;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column">' +
-      '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232;z-index:2">' +
-        '<div>' +
-          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:#F07830">' + esc(titel) + '</div>' +
-          '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + esc(d) + '</div>' +
-        '</div>' + X_BTN +
-      '</div>' +
-      '<div style="padding:16px 20px;flex:1">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
-          '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4">Verfügbare Spieler (Ja / Vielleicht)</div>' +
-          '<div id="auf-counter" style="font-size:12px;font-weight:700;color:#8996B4">0 / ' + min + '</div>' +
-        '</div>' +
+  const modal = modalOeffnen(mdl({
+    breite: 540,
+    sym: SYM.team(),
+    kicker: haPill(termin.heim) + '<span>Aufstellung</span>',
+    titel: esc(termin.gegner),
+    unter: terminUnter(termin),
+    inhalt:
+      '<div>' +
+        '<div class="mdl-gruppe"><span>Verfügbare Spieler (Ja / Vielleicht)</span><span id="auf-counter" class="zaehler">0 / ' + min + '</span></div>' +
         listeHtml +
         '<div id="auf-ersatz-liste">' + ersatzListeHtml + '</div>' +
         (zeigeErsatzOption
-          ? '<button type="button" id="auf-ersatz-add" style="margin-top:2px;padding:8px 14px;border-radius:8px;border:1px dashed rgba(212,98,10,0.5);background:rgba(212,98,10,0.06);color:#F07830;font-size:12px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">+ Ersatz 3. Mannschaft hinzufügen</button>'
+          ? '<button type="button" id="auf-ersatz-add" class="knopf knopf-gestrichelt knopf-klein" style="margin-top:4px">' + SYM.plus('sym-s') + 'Ersatz 3. Mannschaft hinzufügen</button>'
           : '') +
-      '</div>' +
-      '<div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:#152232">' +
-        '<button onclick="this.closest(\'.sp-modal\').remove()" style="padding:9px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#8996B4;font-size:13px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">Abbrechen</button>' +
-        '<button id="auf-save" onclick="speichereAufstellung(\'' + uuidOderLeer(terminId) + '\', this)" style="padding:9px 18px;border-radius:8px;border:none;background:#1D9E75;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">Aufstellung speichern</button>' +
-      '</div>' +
-    '</div>');
+      '</div>',
+    fuss:
+      '<button class="knopf knopf-still" onclick="this.closest(\'.sp-modal\').remove()">Abbrechen</button>' +
+      '<button id="auf-save" class="knopf knopf-gruen" onclick="speichereAufstellung(\'' + uuidOderLeer(terminId) + '\', this)">Aufstellung speichern</button>'
+  }));
 
   const checks = () => Array.from(modal.querySelectorAll('.auf-check'));
   const counter = modal.querySelector('#auf-counter');
@@ -813,10 +804,8 @@ function zeigeAufstellung(terminId) {
   function updateCounter() {
     const n = checks().filter(c => c.checked).length;
     counter.textContent = n + ' / ' + min;
-    counter.style.color = n === min ? '#4FD4A8' : n > min ? '#F08080' : '#8996B4';
+    counter.className = 'zaehler' + (n === min ? ' voll' : n > min ? ' zuviel' : '');
     saveBtn.disabled = (n !== min);
-    saveBtn.style.opacity = (n === min) ? '1' : '0.5';
-    saveBtn.style.cursor  = (n === min) ? 'pointer' : 'not-allowed';
   }
 
   checks().forEach(c => c.addEventListener('change', () => {
@@ -1040,28 +1029,27 @@ async function zeigeImportModal() {
     return;
   }
   importErgebnis = null;
-  modalOeffnen(
-    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.12);border-radius:16px;max-width:760px;width:100%;max-height:90vh;overflow-y:auto">' +
-      '<div style="padding:18px 22px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#152232;z-index:1">' +
-        '<div>' +
-          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:16px;color:#F07830">Spieltermine importieren (CSV)</div>' +
-          '<div style="font-size:13px;color:#8996B4;margin-top:2px">Erst Vorschau und Prüfung – gespeichert wird nur nach Bestätigung.</div>' +
-        '</div>' + X_BTN +
-      '</div>' +
-      '<div style="padding:18px 22px;display:grid;gap:14px">' +
-        '<div style="font-size:13px;color:#CBD8E6;line-height:1.6">Spalten (Kopfzeile, Trenner ; oder ,): <code>Mannschaft;Datum;Uhrzeit;Heim/Auswärts;Gegner;Ort;Spieltag</code><br>' +
-          'Mannschaft: ' + importMannschaften.map(m => '„' + esc(m.name) + '“').join(', ') + ' · Datum: TT.MM.JJJJ · Heim/Auswärts: H oder A</div>' +
-        '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
-          '<input type="file" id="import-datei" accept=".csv,text/csv" style="color:#CBD8E6;font-size:13px">' +
-          '<label style="font-size:13px;color:#8996B4">Halbrunde ' +
-            '<select id="import-halbrunde" style="padding:6px 10px;border-radius:8px;background:#1e3048;color:#F7F9FF;border:1px solid rgba(255,255,255,0.1)">' +
+  modalOeffnen(mdl({
+    breite: 820,
+    sym: SYM.hochladen(),
+    kicker: '<span>Admin · CSV-Import</span>',
+    titel: 'Spieltermine importieren (CSV)',
+    unter: '<span>Erst Vorschau und Prüfung – gespeichert wird nur nach Bestätigung.</span>',
+    inhalt:
+      '<div class="mdl-text">Spalten (Kopfzeile, Trenner ; oder ,): <code>Mannschaft;Datum;Uhrzeit;Heim/Auswärts;Gegner;Ort;Spieltag</code><br>' +
+        'Mannschaft: ' + importMannschaften.map(m => '„' + esc(m.name) + '“').join(', ') + ' · Datum: TT.MM.JJJJ · Heim/Auswärts: H oder A</div>' +
+      '<div class="tafel">' +
+        '<div class="feld-raster" style="grid-template-columns:2fr 1fr">' +
+          '<div><label class="feld-label" for="import-datei">CSV-Datei</label><input class="eingabe" type="file" id="import-datei" accept=".csv,text/csv"></div>' +
+          '<div><label class="feld-label" for="import-halbrunde">Halbrunde</label>' +
+            '<select class="eingabe" id="import-halbrunde">' +
               '<option value="Rückrunde" selected>Rückrunde</option><option value="Vorrunde">Vorrunde</option>' +
-            '</select></label>' +
-          '<button onclick="pruefeImportDatei(this)" style="padding:8px 14px;border-radius:8px;background:#D4620A;border:none;color:#fff;font-weight:700;cursor:pointer;font-family:Calibri,sans-serif">Prüfen & Vorschau</button>' +
+            '</select></div>' +
         '</div>' +
-        '<div id="import-vorschau"></div>' +
+        '<button class="knopf knopf-akzent" style="margin-top:12px" onclick="pruefeImportDatei(this)">' + SYM.liste('sym-s') + 'Prüfen & Vorschau</button>' +
       '</div>' +
-    '</div>');
+      '<div id="import-vorschau"></div>'
+  }));
 }
 
 function importVorschauHtml(erg, serverFehler, serverWarnungen) {
@@ -1080,25 +1068,25 @@ function importVorschauHtml(erg, serverFehler, serverWarnungen) {
   const anzFehler = erg.zeilen.filter(z => z.fehler.length).length;
   const rows = erg.zeilen.map(z => {
     const d = z.daten;
-    const st = z.fehler.length ? '#F08080' : z.warnungen.length ? '#F0C060' : '#4FD4A8';
+    const st = z.fehler.length ? 'fehler' : z.warnungen.length ? 'warn' : 'ok';
     return '<tr>' +
-      '<td style="color:#8996B4">' + z.nr + '</td>' +
+      '<td style="color:var(--muted)">' + z.nr + '</td>' +
       '<td>' + esc(d.mannschaft) + '</td>' +
-      '<td>' + esc(d.datum ? fmt(d.datum, { day:'2-digit', month:'2-digit', year:'numeric' }) : '–') + ' ' + esc(d.uhrzeit) + '</td>' +
+      '<td style="white-space:nowrap">' + esc(d.datum ? fmt(d.datum, { day:'2-digit', month:'2-digit', year:'numeric' }) : '–') + ' ' + esc(d.uhrzeit) + '</td>' +
       '<td>' + (d.heim === null ? '?' : d.heim ? 'H' : 'A') + '</td>' +
       '<td>' + esc(d.gegner) + '</td>' +
-      '<td style="color:' + st + ';font-size:12px">' +
+      '<td class="' + st + '" style="font-size:13px">' +
         (z.fehler.length ? z.fehler.map(esc).join('<br>') : z.warnungen.length ? z.warnungen.map(esc).join('<br>') : '✓ ok') +
       '</td></tr>';
   }).join('');
   const ok = anzFehler === 0 && erg.zeilen.length > 0;
-  return '<div style="font-size:13px;margin-bottom:8px;color:' + (ok ? '#4FD4A8' : '#F08080') + '">' +
+  return '<div class="ergebnis ' + (ok ? 'gut' : 'schlecht') + '">' + (ok ? SYM.haken('sym-s') : SYM.warnung('sym-s')) +
       erg.zeilen.length + ' Zeilen · ' + (erg.zeilen.length - anzFehler) + ' gültig · ' + anzFehler + ' mit Fehlern' +
     '</div>' +
-    '<div class="table-scroll"><table class="spielplan-table"><thead><tr><th>Zeile</th><th>Mannschaft</th><th>Datum</th><th>H/A</th><th>Gegner</th><th>Prüfung</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<div class="mini-rahmen"><table class="mini-tabelle"><thead><tr><th>Zeile</th><th>Mannschaft</th><th>Datum</th><th>H/A</th><th>Gegner</th><th>Prüfung</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     (ok
-      ? '<button onclick="importSpeichern(this)" style="margin-top:12px;width:100%;padding:11px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-family:Bahnschrift SemiBold,Calibri,sans-serif;font-size:14px;cursor:pointer">' + erg.zeilen.length + ' Termine jetzt importieren</button>'
-      : '<div style="margin-top:10px;font-size:13px;color:#8996B4">Bitte die Datei korrigieren und erneut prüfen. Es wird nichts gespeichert, solange Fehler vorhanden sind.</div>');
+      ? '<button class="knopf knopf-gruen knopf-voll" style="margin-top:12px" onclick="importSpeichern(this)">' + SYM.hochladen('sym-s') + erg.zeilen.length + ' Termine jetzt importieren</button>'
+      : '<div class="mdl-hinweis" style="margin-top:10px">Bitte die Datei korrigieren und erneut prüfen. Es wird nichts gespeichert, solange Fehler vorhanden sind.</div>');
 }
 
 async function pruefeImportDatei(btn) {

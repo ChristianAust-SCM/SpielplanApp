@@ -206,7 +206,7 @@ test.describe.serial(`Neues Frontend · Abnahme · Stufe ${STUFE}`, () => {
     await anmelden(page, 'mf1@test.invalid');
     for (const [abschnitt, typ] of [[0, 'PDF'], [0, 'Excel'], [1, 'PDF'], [1, 'Excel']]) {
       await page.click('#btn-export');
-      const gruppe = page.locator('#export-menu-overlay div[style*="grid-template-columns"]').nth(abschnitt);
+      const gruppe = page.locator('#export-menu-overlay .exp-gruppe').nth(abschnitt);
       const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }),
         gruppe.locator('button', { hasText: typ }).click()]);
       expect(dl.suggestedFilename()).toMatch(typ === 'PDF' ? /\.pdf$/ : /\.xlsx$/);
