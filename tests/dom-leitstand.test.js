@@ -163,3 +163,12 @@ test('Datenbankfehler werden verständlich angezeigt statt leerer Tabelle', asyn
   await warten(20);
   assert.match(document.getElementById('table-container').textContent, /Keine Berechtigung für diese Aktion/);
 });
+
+test('Kennzahl „Spieltage ohne Antworten“ zählt nur Termine ganz ohne Rückmeldung', async () => {
+  const { document, window } = await leitstand('mf');
+  window.setzeHalbrunde('Vorrunde');
+  assert.equal(document.querySelector('.k-offen .stat-label').textContent, 'Spieltage ohne Antworten');
+  assert.equal(document.getElementById('stat-offen').textContent, '0');            // Vorrunde: 4 Antworten vorhanden
+  window.setzeHalbrunde('Rückrunde');
+  assert.equal(document.getElementById('stat-offen').textContent, '1');            // Rückrunde: noch niemand geantwortet
+});

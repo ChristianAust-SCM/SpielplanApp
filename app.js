@@ -416,9 +416,9 @@ function renderTabelle() {
     });
 
     const statusBadge = t.status === 'Verschoben'
-      ? '<span class="datum-status">· ALTERNATIVTERMIN</span>'
+      ? '<span class="datum-status">ALTERNATIVTERMIN</span>'
       : t.status === 'Verschiebung nötig'
-      ? '<span class="datum-status noetig">· VERSCHIEBUNG NÖTIG</span>'
+      ? '<span class="datum-status noetig">VERSCHIEBUNG NÖTIG</span>'
       : '';
 
     const altTermineInfo = alleAlternativtermine.filter(a => a.spieltermin_id === t.id);

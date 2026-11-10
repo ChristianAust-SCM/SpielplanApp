@@ -123,20 +123,21 @@
     .spielplan-table tbody tr { transition: background 120ms; }
     .spielplan-table tbody tr:hover { background: rgba(29,52,86,0.45); }
 
-    .zelle-datum { display: flex; align-items: center; gap: 14px; min-width: 175px; }
+    .zelle-datum { display: flex; align-items: center; gap: 12px; min-width: 150px; }
     .zelle-datum > .sym { color: var(--text2); width: 22px; height: 22px; }
     .datum-main { font-weight: 600; font-size: 16px; color: var(--text); line-height: 1.25; white-space: nowrap; }
     .datum-sub  { font-size: 13.5px; color: var(--text2); display: flex; align-items: center; gap: 5px; line-height: 1.3; }
     .datum-sub .sym { width: 13px; height: 13px; }
-    .datum-status { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--gelb); margin-left: 4px; }
+    .datum-status { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: var(--gelb); line-height: 1.3; }
     .datum-status.noetig { color: var(--orange2); }
     .datum-alt { font-size: 12.5px; color: var(--orange2); font-weight: 600; white-space: nowrap; }
     .datum-alt-alt { color: var(--muted); text-decoration: line-through; }
 
     .zelle-gegner { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 16px; }
     .zelle-gegner > .sym { width: 24px; height: 24px; color: var(--text2); }
-    .gegner-name { white-space: nowrap; }
-    .zelle-gegner .pill-auf { margin-left: auto; }
+    .gegner-name { white-space: normal; min-width: 0; }
+    .zelle-gegner { min-width: 190px; }
+    .zelle-gegner .pill-auf { margin-left: auto; flex-shrink: 0; }
 
     .badges { display: flex; gap: 6px; flex-wrap: nowrap; }
     .alt-box { margin-top: 6px; background: rgba(240,122,34,0.08); border: 1px solid rgba(240,122,34,0.22); border-radius: 8px; padding: 4px 8px; }
@@ -149,7 +150,8 @@
     .rm-alt { margin-bottom: 5px; cursor: pointer; }
     .rm-alt-titel { font-size: 11px; color: var(--muted); }
 
-    .aktionen { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: nowrap; }
+    /* Aktionen: vier Knöpfe in einer Reihe; „Verlegung prüfen“ steht darüber statt daneben */
+    .aktionen { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; width: 192px; margin-left: auto; }
     .ak {
       display: inline-flex; align-items: center; justify-content: center;
       width: 42px; height: 34px; border-radius: 9px; border: 1px solid transparent;
@@ -167,7 +169,7 @@
       display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
       padding: 6px 14px; border-radius: 9px; cursor: pointer;
       background: rgba(255,90,82,0.18); border: 1px solid rgba(255,90,82,0.70); color: #ffd9d6;
-      font-size: 14px; font-weight: 600; margin-right: 6px;
+      font-size: 14px; font-weight: 600; flex-basis: 100%; justify-content: center;
     }
     .ak-verlegung .sym { color: var(--rot); width: 17px; height: 17px; }
     .ak-verlegung:hover { background: rgba(255,90,82,0.28); }
@@ -241,8 +243,29 @@
     .dt-trenner { height: 1px; background: var(--rand); margin: 14px 0; }
     .dt-alle { font-size: 14px; color: var(--gruen); padding: 6px 0 10px; display: flex; gap: 8px; align-items: center; }
 
+    /* Schmalere Desktops: Tabelle kompakter statt seitlich scrollen */
+    @media (max-width: 1440px) {
+      .spielplan-table td, .spielplan-table thead th { padding-left: 10px; padding-right: 10px; }
+      .zelle-gegner { gap: 9px; }
+      .zelle-gegner .pill-auf { margin-left: 0; }
+      .zelle-gegner { flex-wrap: wrap; }
+    }
+    @media (max-width: 1280px) {
+      .main { padding-left: 20px; padding-right: 20px; }
+      .spielplan-table { font-size: 14px; }
+      .datum-main, .zelle-gegner { font-size: 15px; }
+      .zelle-datum { gap: 9px; min-width: 128px; }
+      .zelle-datum > .sym, .zelle-gegner > .sym { width: 18px; height: 18px; }
+      .zelle-gegner { min-width: 150px; }
+      .badges { flex-wrap: wrap; gap: 4px; }
+      .aktionen { width: 158px; gap: 6px; }
+      .ak { width: 35px; height: 32px; }
+      .ak-verlegung { font-size: 13px; padding: 5px 10px; }
+    }
     @media (max-width: 1100px) {
       .stats { grid-template-columns: repeat(2, 1fr); }
+      .aktionen { width: 76px; }
+      .ak-verlegung { font-size: 12px; padding: 5px 6px; gap: 4px; }
     }
     @media (max-width: 680px) {
       .kopf-innen { padding: 14px 14px; }
@@ -296,7 +319,7 @@
       .gegner-name { white-space: normal; }
       .zelle-gegner .pill-auf { margin-left: 0; }
       .badges { flex-wrap: wrap; }
-      .aktionen { justify-content: stretch; flex-wrap: wrap; gap: 8px; }
+      .aktionen { justify-content: stretch; flex-wrap: wrap; gap: 8px; width: auto; margin-left: 0; }
       .ak { flex: 1; width: auto; height: 42px; }
       .ak-verlegung { flex-basis: 100%; justify-content: center; margin-right: 0; padding: 9px 14px; }
       .spielplan-table tbody tr.zeile-kritisch {
@@ -357,7 +380,7 @@
   <!-- Statistik-Leiste -->
   <div class="stats" id="stats">
     <div class="stat-card k-gesamt"><span data-sym="kalender" class="stat-sym"></span><div><div class="stat-label">Spieltage gesamt</div><div class="stat-value" id="stat-gesamt">–</div></div><span data-sym="kalender" class="stat-bg"></span></div>
-    <div class="stat-card k-offen"><span data-sym="liste" class="stat-sym"></span><div><div class="stat-label">Abfragen offen</div><div class="stat-value warn" id="stat-offen">–</div></div><span data-sym="haken" class="stat-bg"></span></div>
+    <div class="stat-card k-offen" title="Spieltage, zu denen noch kein einziger Spieler geantwortet hat. Einzelne fehlende Antworten stehen in der Spalte Rückmeldung."><span data-sym="liste" class="stat-sym"></span><div><div class="stat-label">Spieltage ohne Antworten</div><div class="stat-value warn" id="stat-offen">–</div></div><span data-sym="haken" class="stat-bg"></span></div>
     <div class="stat-card k-krit"><span data-sym="warnung" class="stat-sym"></span><div><div class="stat-label" for-stat="krit">Zu wenig (&lt;6 Zusagen)</div><div class="stat-value crit" id="stat-krit">–</div></div><span data-sym="warnung" class="stat-bg"></span></div>
     <div class="stat-card k-ok"><span data-sym="team" class="stat-sym"></span><div><div class="stat-label" for-stat="ok">Spielbereit (≥6 Ja)</div><div class="stat-value ok" id="stat-ok">–</div></div><span data-sym="team" class="stat-bg"></span></div>
   </div>
