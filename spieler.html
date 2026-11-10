@@ -8,105 +8,119 @@
   <meta name="robots" content="noindex, nofollow">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
   <script src="js/config.js"></script>
+  <script src="js/symbole.js"></script>
   <script src="js/sicherheit.js"></script>
+  <link rel="stylesheet" href="css/premium.css">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --navy:#0D1B2A; --navy2:#152232; --navy3:#1e3048;
-      --orange:#D4620A; --orange2:#F07830;
-      --teal:#1D9E75; --white:#F7F9FF; --muted:#8996B4;
-      --line:rgba(255,255,255,0.10); --radius:10px;
+    body { display: flex; flex-direction: column; align-items: center; padding: 22px 16px 40px; }
+    .brand { width: 100%; max-width: 480px; margin-bottom: 18px; }
+    .brand .marke-logo { width: 42px; height: 42px; }
+    .brand .marke-titel { font-size: 22px; }
+    .brand .marke-sub { font-size: 13.5px; }
+    .card {
+      width: 100%; max-width: 480px; overflow: hidden;
+      background: linear-gradient(180deg, rgba(23,43,71,0.92), rgba(16,30,52,0.94));
+      border: 1px solid var(--rand-stark); border-radius: 18px;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.45);
     }
-    body {
-      font-family: Calibri,'Segoe UI',system-ui,sans-serif;
-      background:var(--navy); color:var(--white);
-      min-height:100vh; display:flex; flex-direction:column;
-      align-items:center; padding:24px 16px 48px;
+    .card-header {
+      position: relative; padding: 20px 22px 18px;
+      background: linear-gradient(135deg, rgba(240,122,34,0.18) 0%, rgba(23,43,71,0.0) 55%);
+      border-bottom: 1px solid var(--rand);
     }
-    .brand { margin-bottom:20px; text-align:center; }
-    .brand-name { font-family:'Bahnschrift SemiBold','Segoe UI Semibold',sans-serif; font-size:16px; color:var(--orange2); }
-    .brand-sub { font-size:12px; color:var(--muted); }
-    .card { width:100%; max-width:480px; background:var(--navy2); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
-    .card-header { background:var(--navy3); padding:20px 24px; border-bottom:1px solid var(--line); }
-    .card-header h1 { font-family:'Bahnschrift SemiBold',sans-serif; font-size:20px; color:var(--orange2); margin-bottom:4px; }
-    .card-header .meta { font-size:13px; color:var(--muted); line-height:1.5; }
-    .card-body { padding:24px; }
-    .field { margin-bottom:20px; }
-    .field label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted); margin-bottom:8px; }
+    .card-header::after {
+      content: ''; position: absolute; left: 22px; right: 22px; bottom: -1px; height: 2px;
+      background: linear-gradient(90deg, var(--orange), rgba(240,122,34,0));
+    }
+    .kicker { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+    .card-header h1 { font-family: var(--schrift-k); font-weight: 700; font-size: 25px; line-height: 1.15; color: var(--text); margin-bottom: 10px; }
+    .meta { display: flex; flex-direction: column; gap: 5px; font-size: 15px; color: var(--text2); }
+    .meta-zeile { display: flex; align-items: center; gap: 9px; }
+    .meta-zeile .sym { width: 17px; height: 17px; color: var(--orange2); }
+    .meta-hinweis { margin-top: 6px; color: var(--orange2); font-weight: 600; font-size: 14px; }
+    .card-body { padding: 22px; }
+    .field { margin-bottom: 20px; }
+    .field > label, .feld-titel { display: block; font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text2); margin-bottom: 9px; }
+    .spieler-select, .freitext-input, .anmerkung {
+      width: 100%; padding: 13px 14px; font-size: 16px;
+      background: rgba(10,20,36,0.55); border: 1px solid var(--rand-stark); border-radius: 12px;
+      color: var(--text); outline: none; transition: border-color 140ms;
+    }
     .spieler-select {
-      width:100%; padding:12px 36px 12px 14px;
-      background:var(--navy3); border:1px solid var(--line);
-      border-radius:var(--radius); color:var(--white);
-      font-family:Calibri,sans-serif; font-size:15px;
-      outline:none; cursor:pointer; appearance:none;
-      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238996B4' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-      background-repeat:no-repeat; background-position:right 14px center;
-      transition:border-color 140ms;
+      padding-right: 40px; appearance: none; -webkit-appearance: none; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23ff9440' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
     }
-    .spieler-select:focus { border-color:var(--teal); }
-    .spieler-select option { background:var(--navy2); }
-    .nicht-kader { margin-top:8px; font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
-    .nicht-kader:hover { color:var(--white); }
-    .freitext-input {
-      width:100%; padding:11px 14px;
-      background:var(--navy3); border:1px solid var(--line);
-      border-radius:var(--radius); color:var(--white);
-      font-family:Calibri,sans-serif; font-size:15px;
-      outline:none; transition:border-color 140ms;
+    .spieler-select:focus, .freitext-input:focus, .anmerkung:focus { border-color: var(--orange); }
+    .spieler-select option { background: #12233b; color: var(--text); }
+    .spieler-select:disabled { opacity: 1; cursor: default; }
+    .freitext-input::placeholder, .anmerkung::placeholder { color: var(--muted); }
+    .anmerkung { resize: vertical; min-height: 78px; }
+    .nicht-kader {
+      margin-top: 10px; font-size: 14px; color: var(--text2); cursor: pointer;
+      text-decoration: underline; text-underline-offset: 3px; min-height: 32px;
     }
-    .freitext-input:focus { border-color:var(--teal); }
-    .freitext-input::placeholder { color:var(--muted); }
-    .antwort-gruppe { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .nicht-kader:hover { color: var(--text); }
+    .antwort-gruppe { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .antwort-btn {
-      padding:14px 8px; border-radius:var(--radius);
-      border:2px solid var(--line); background:var(--navy3);
-      color:var(--muted); font-family:Calibri,sans-serif;
-      font-size:14px; font-weight:700; cursor:pointer;
-      text-align:center; transition:all 160ms;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+      min-height: 84px; padding: 12px 6px; border-radius: 14px;
+      border: 1.5px solid var(--rand-stark); background: rgba(10,20,36,0.45);
+      color: var(--text2); font-size: 16px; font-weight: 700; cursor: pointer;
+      transition: border-color 140ms, background 140ms, color 140ms;
     }
-    .antwort-btn:hover { border-color:rgba(255,255,255,0.25); color:var(--white); }
-    .sel-ja      { border-color:var(--teal)  !important; background:rgba(29,158,117,0.18) !important; color:#4FD4A8 !important; }
-    .sel-nein    { border-color:#E24B4A      !important; background:rgba(226,75,74,0.15)  !important; color:#F08080 !important; }
-    .sel-bedingt { border-color:#F0B429      !important; background:rgba(240,180,41,0.12) !important; color:#F0C060 !important; }
-    .anmerkung {
-      width:100%; padding:11px 14px;
-      background:var(--navy3); border:1px solid var(--line);
-      border-radius:var(--radius); color:var(--white);
-      font-family:Calibri,sans-serif; font-size:14px;
-      outline:none; resize:vertical; min-height:72px;
-      transition:border-color 140ms;
+    .antwort-btn .ab-sym {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.06);
     }
-    .anmerkung:focus { border-color:var(--teal); }
-    .anmerkung::placeholder { color:var(--muted); }
+    .antwort-btn .ab-sym .sym { width: 19px; height: 19px; }
+    .antwort-btn:hover { border-color: rgba(255,255,255,0.35); color: var(--text); }
+    .antwort-btn[data-val="Ja"] .ab-sym { color: var(--gruen); }
+    .antwort-btn[data-val="Vielleicht"] .ab-sym { color: var(--gelb); }
+    .antwort-btn[data-val="Nein"] .ab-sym { color: var(--rot); }
+    .sel-ja      { border-color: var(--gruen) !important; background: rgba(47,207,143,0.16) !important; color: #7ff0c0 !important; }
+    .sel-bedingt { border-color: var(--gelb)  !important; background: rgba(245,184,61,0.14) !important; color: #ffd27a !important; }
+    .sel-nein    { border-color: var(--rot)   !important; background: rgba(255,90,82,0.14)  !important; color: #ff9c96 !important; }
+    .sel-ja .ab-sym      { background: var(--gruen) !important; color: #06281b !important; }
+    .sel-bedingt .ab-sym { background: var(--gelb)  !important; color: #2b1d00 !important; }
+    .sel-nein .ab-sym    { background: var(--rot)   !important; color: #2e0705 !important; }
     .btn-submit {
-      width:100%; padding:14px; background:var(--teal);
-      color:#fff; border:none; border-radius:var(--radius);
-      font-family:'Bahnschrift SemiBold',Calibri,sans-serif;
-      font-size:16px; cursor:pointer; transition:opacity 160ms; margin-top:4px;
+      width: 100%; padding: 15px; margin-top: 2px;
+      background: linear-gradient(180deg, #ff8a2e, #e8670f); color: #fff;
+      border: 1px solid #ff9440; border-radius: 14px;
+      font-family: var(--schrift-k); font-weight: 700; font-size: 18px; letter-spacing: 0.02em;
+      cursor: pointer; box-shadow: 0 6px 20px rgba(240,122,34,0.35);
+      transition: opacity 140ms;
     }
-    .btn-submit:hover:not(:disabled) { opacity:0.88; }
-    .btn-submit:disabled { opacity:0.4; cursor:not-allowed; }
-    .success-box { text-align:center; padding:40px 24px; }
-    .success-icon { width:56px; height:56px; border-radius:50%; background:rgba(29,158,117,0.18); border:2px solid var(--teal); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; font-size:26px; }
-    .success-box h2 { font-family:'Bahnschrift SemiBold',sans-serif; font-size:20px; color:var(--teal); margin-bottom:8px; }
-    .success-box p { color:var(--muted); font-size:14px; line-height:1.6; }
-    .error-msg { background:rgba(226,75,74,0.12); border:1px solid rgba(226,75,74,0.3); border-radius:8px; padding:12px 14px; font-size:13px; color:#F08080; margin-top:12px; }
-    .footer-hint { font-size:12px; color:var(--muted); text-align:center; margin-top:20px; line-height:1.5; }
-    .hidden { display:none !important; }
-    .antwort-btn { min-height:48px; }
-    .spieler-select, .freitext-input, .anmerkung { font-size:16px; } /* verhindert iOS-Zoom */
-    .spieler-select:disabled { opacity:1; cursor:default; }
+    .btn-submit:disabled { opacity: 0.38; cursor: not-allowed; box-shadow: none; }
+    .success-box { text-align: center; padding: 34px 16px; }
+    .success-icon {
+      width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center; font-size: 28px;
+      background: rgba(47,207,143,0.16); border: 2px solid var(--gruen); color: var(--gruen);
+    }
+    .success-box h2 { font-family: var(--schrift-k); font-size: 24px; color: var(--text); margin-bottom: 8px; }
+    .success-box p { color: var(--text2); font-size: 15px; line-height: 1.6; }
+    .success-box strong { color: var(--gruen); }
+    .error-msg { background: var(--rot-bg); border: 1px solid rgba(255,90,82,0.4); border-radius: 12px; padding: 13px 14px; font-size: 14px; color: #ffb3ae; margin-top: 12px; }
+    .footer-hint { font-size: 13px; color: var(--muted); text-align: center; margin-top: 18px; line-height: 1.55; max-width: 480px; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-<div class="brand">
-  <div class="brand-name">FC Strass e.V.</div>
-  <div class="brand-sub">Verfügbarkeitsabfrage</div>
+<div class="brand marke">
+  <span id="marke-logo"></span>
+  <div>
+    <div class="marke-titel"><em>FC Strass e.V.</em></div>
+    <div class="marke-sub">Verfügbarkeitsabfrage · Tischtennis</div>
+  </div>
 </div>
 
 <div class="card">
   <div class="card-header">
+    <div class="kicker" id="spiel-kicker"></div>
     <h1 id="spiel-titel">Lade Spieltermin...</h1>
     <div class="meta" id="spiel-meta"></div>
   </div>
@@ -142,11 +156,14 @@
   var gewaehlteAntwort = null;
   var nichtKaderModus = false;
 
-  function datumText(iso, uhrzeit) {
+  var logo = document.getElementById('marke-logo');
+  if (logo) logo.outerHTML = SYM.marke();
+
+  function datumText(iso) {
     var d = SPS.lokalesDatum(iso);
-    var dt = d ? d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';
-    return dt + (uhrzeit ? ' · ' + String(uhrzeit).slice(0, 5) + ' Uhr' : '');
+    return d ? d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';
   }
+  function zeile(sym, text) { return '<div class="meta-zeile">' + sym + '<span>' + esc(text) + '</span></div>'; }
 
   async function laden() {
     if (!SPS.istGueltigesToken(token)) {
@@ -168,11 +185,15 @@
     var art = (t.heim ? 'Heimspiel' : 'Auswärtsspiel') + ' gegen ' + t.gegner;
 
     document.getElementById('spiel-titel').textContent = (alt ? '📅 Ausweichtermin: ' : '') + art;
+    var zeit = alt ? alt.uhrzeit : t.uhrzeit;
+    document.getElementById('spiel-kicker').innerHTML =
+      '<span class="pill ' + (t.heim ? 'pill-heim' : 'pill-ausw') + '">' + (t.heim ? 'Heim' : 'Auswärts') + '</span>' +
+      '<span>' + esc(m.name) + ' &middot; ' + esc(m.liga) + '</span>';
     document.getElementById('spiel-meta').innerHTML =
-      esc(m.name) + ' &middot; ' + esc(m.liga) +
-      '<br>' + esc(datumText(alt ? alt.datum : t.datum, alt ? alt.uhrzeit : t.uhrzeit)) +
-      (t.ort ? '<br>' + esc(t.ort) : '') +
-      (alt ? '<br><span style="color:#F07830;font-weight:700">Bitte abstimmen ob ihr an diesem Ausweichtermin spielen könnt</span>' : '');
+      zeile(SYM.kalender(), datumText(alt ? alt.datum : t.datum)) +
+      (zeit ? zeile(SYM.uhr(), String(zeit).slice(0, 5) + ' Uhr') : '') +
+      (t.ort ? zeile(SYM.ort(), t.ort) : '') +
+      (alt ? '<div class="meta-hinweis">Bitte abstimmen, ob ihr an diesem Ausweichtermin spielen könnt.</div>' : '');
     renderFormular();
   }
 
@@ -197,11 +218,11 @@
         '<input type="text" class="freitext-input" id="freitext" maxlength="60" autocomplete="name" placeholder="Name eingeben">' +
       '</div>' +
       '<div class="field">' +
-        '<label>Kannst du spielen?</label>' +
-        '<div class="antwort-gruppe">' +
-          '<button type="button" class="antwort-btn" data-val="Ja" data-cls="sel-ja">Ja</button>' +
-          '<button type="button" class="antwort-btn" data-val="Vielleicht" data-cls="sel-bedingt">Vielleicht</button>' +
-          '<button type="button" class="antwort-btn" data-val="Nein" data-cls="sel-nein">Nein</button>' +
+        '<div class="feld-titel" id="antwort-titel">Kannst du spielen?</div>' +
+        '<div class="antwort-gruppe" role="group" aria-labelledby="antwort-titel">' +
+          '<button type="button" class="antwort-btn" data-val="Ja" data-cls="sel-ja"><span class="ab-sym">' + SYM.haken() + '</span>Ja</button>' +
+          '<button type="button" class="antwort-btn" data-val="Vielleicht" data-cls="sel-bedingt"><span class="ab-sym">' + SYM.frage() + '</span>Vielleicht</button>' +
+          '<button type="button" class="antwort-btn" data-val="Nein" data-cls="sel-nein"><span class="ab-sym">' + SYM.kreuz() + '</span>Nein</button>' +
         '</div>' +
       '</div>' +
       '<div class="field">' +
@@ -288,7 +309,7 @@
       '<div class="success-box">' +
         '<div class="success-icon">&#10003;</div>' +
         '<h2>Danke, ' + esc(anzeigeVorname) + '!</h2>' +
-        '<p>Deine Rückmeldung (<strong style="color:var(--teal)">' + esc(gewaehlteAntwort) + '</strong>) wurde gespeichert.<br>' +
+        '<p>Deine Rückmeldung (<strong>' + esc(gewaehlteAntwort) + '</strong>) wurde gespeichert.<br>' +
         'Du kannst diesen Tab jetzt schließen.</p>' +
       '</div>';
   }
