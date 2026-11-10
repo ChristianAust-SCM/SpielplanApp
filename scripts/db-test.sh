@@ -81,6 +81,9 @@ anwenden "$ROOT/supabase/baseline/00_produktion_rekonstruiert.sql"
 anwenden "$ROOT/supabase/tests/_seed.sql"
 for t in "$ROOT"/supabase/tests/1[0-9]_*.sql; do testen "$t"; done
 
+# Das Test-Image hat ein verkürztes auth.users; Produktionsspalten nachbilden (nur Test)
+psql -X -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PORT" -U supabase_admin -d postgres -c "alter table auth.users add column if not exists email_confirmed_at timestamptz,
+  add column if not exists last_sign_in_at timestamptz" >/dev/null
 if "${PSQL[@]}" -f "$ROOT/supabase/pruefung/vorabpruefung_readonly.sql" >/dev/null 2>"$ROOT/.vorab.err"; then
   echo "  ✓ Vorabprüfung läuft fehlerfrei gegen den Ist-Zustand (read-only-Transaktion)"
 else

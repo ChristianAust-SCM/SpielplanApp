@@ -108,4 +108,34 @@ select rolle, count(*) as neu_seit_audit
   from public.nutzer_rollen where created_at > timestamptz '2026-11-09 10:56:00+00'
  group by rolle;
 
+-- 11. Plausibilität der Rollenzuordnungen – PSEUDONYMISIERT -----------------
+-- Keine Namen, keine E-Mails, keine IDs. "konto" ist ein 6-stelliges
+-- Pseudonym (Hash), nur um Zeilen desselben Kontos zu gruppieren.
+-- Mannschaftsnamen sind Vereinsdaten, keine Personendaten.
+select row_number() over (order by m.name nulls last, nr.rolle) as nr,
+       left(md5(nr.user_id::text || 'spielplan-vorab'), 6)       as konto,
+       nr.rolle,
+       m.name                                                    as mannschaft,
+       (u.id is not null)                                        as konto_existiert,
+       (u.email_confirmed_at is not null)                        as email_bestaetigt,
+       (u.last_sign_in_at)::date                                 as letzte_anmeldung,
+       (nr.created_at)::date                                     as rolle_angelegt,
+       (lower(u.email) = lower(m.mf_email))                      as email_passt_zu_mf_eintrag,
+       (count(*) over (partition by nr.user_id))::int            as rollen_des_kontos
+  from public.nutzer_rollen nr
+  left join public.mannschaften m on m.id = nr.mannschaft_id
+  left join auth.users u          on u.id = nr.user_id
+ order by 1;
+
+-- 11b. Mannschaften (für Mindeststärken): je Mannschaft Anzahl MF-/Admin-Rollen
+select m.name, m.liga,
+       count(nr.id) filter (where nr.rolle = 'mf')    as mf_rollen,
+       count(nr.id) filter (where nr.rolle = 'admin') as admin_rollen
+  from public.mannschaften m left join public.nutzer_rollen nr on nr.mannschaft_id = m.id
+ group by m.id, m.name, m.liga order by m.name;
+
+-- 11c. Konten ohne jede Rolle (nur Anzahl)
+select count(*) as konten_ohne_rolle
+  from auth.users u where not exists (select 1 from public.nutzer_rollen nr where nr.user_id = u.id);
+
 rollback;
