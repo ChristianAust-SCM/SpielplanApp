@@ -1,7 +1,7 @@
 # Freigabebericht Migration 01 · 10.11.2026 (Stand 06:20)
 
 Migration: `supabase/migrations/20261110000100_sicherheit_rollen_und_hilfsfunktionen.sql`
-Branch: `develop/spielplan-app-2.0` · **nicht angewendet, nicht gepusht, kein Deployment**
+Branch: `develop/spielplan-app-2.0` · **produktiv angewendet am 10.11.2026 07:00 (Backup `2026-11-10_065854`), Ergebnis: `PRODUKTIV_MIGRATION01_2026-11-10.md`**
 
 **Gesamturteil: Migration 01 ist inhaltlich vollständig freigabefähig.** Vor der Anwendung
 fehlt nur noch ein Nachweis: ein frisches, verifiziertes Backup (§5). Bei einer
