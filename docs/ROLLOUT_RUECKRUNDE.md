@@ -3,7 +3,10 @@
 Stand 10.11.2026. Migration 01 ist produktiv (07:00, Backup `2026-11-10_065854`).
 **Stufe A (02–05) ist produktiv** (08:50, Gibbs-Task `t_a6675f04`, Backup `2026-11-10_084621`,
 Nachprüfung 24/24 PASS, Daten 302 Zeilen und SR-Policies 19 unverändert, R02_05 bereit).
-Offen: Funktionsprobe A7 durch Christian.
+Funktionsprobe A7 durch Christian bestanden.
+**Stufe B produktiv** (Merge-Commit `7458cf4` auf `main`, GitHub Pages, Live-Auslieferung geprüft, Live-Kurztest 4/4).
+**Stufe C produktiv** (10:30, Gibbs-Task `t_73fe039a`, Backup `2026-11-10_102118`; anon nur noch `vereinsbefragung` INSERT;
+Spielerabfrage als anon mit 5 echten Links vorher/nachher 5/5; Admin/MF unverändert; SR-Policies 19; R09 bereit).
 Alles Weitere ist in Staging mit echtem Stack geprüft (`docs/STAGING.md`, 38/38).
 
 Jede Stufe hat eine eigene Freigabe. Ausführung der Datenbankschritte durch Gibbs

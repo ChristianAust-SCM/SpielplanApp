@@ -28,13 +28,13 @@ function fixtures(rolle) {
   };
 }
 
-async function leitstand(rolle = 'mf', rpc = {}) {
+async function leitstand(rolle = 'mf', rpc = {}, quelltext) {
   const mock = supabaseMock({
     tabellen: fixtures(rolle), rpc,
     session: { user: { id: '00000000-0000-4000-a000-0000000000b1', email: 'mf' + XSS + '@test.invalid' } }
   });
   const seite = seiteLaden('index.html', {
-    mock,
+    mock, quelltext,
     vorbereiten(w) {
       w.navigator.clipboard = { writeText: (t) => { w.__zwischenablage = t; return Promise.resolve(); } };
     }
@@ -132,6 +132,26 @@ test('Admin sieht Importfunktion, MF nicht', async () => {
   assert.ok(!/Termine importieren/.test(mf.document.getElementById('runde-umschalter').textContent));
   const admin = await leitstand('admin');
   assert.match(admin.document.getElementById('runde-umschalter').textContent, /Termine importieren/);
+});
+
+test('Turnier-Helfer-Reiter ist standardmäßig ausgeblendet, auch für Admins', async () => {
+  for (const rolle of ['admin', 'mf']) {
+    const { document, mock } = await leitstand(rolle);
+    assert.equal(document.querySelectorAll('#tabs .tab-turnier').length, 0, rolle + ': kein Turnier-Reiter');
+    assert.equal(mock.aufrufe.filter(a => a.tabelle === 'turnier_helfer').length, 0, rolle + ': keine Helferdaten geladen');
+  }
+});
+
+test('Turnier-Helfer lässt sich per Konfiguration reaktivieren (nur Admin)', async () => {
+  const an = (src, code) => src === 'js/config.js' ? code.replace('TURNIER_HELFER_ANZEIGEN: false', 'TURNIER_HELFER_ANZEIGEN: true') : code;
+  const admin = await leitstand('admin', {}, an);
+  const tab = admin.document.querySelector('#tabs .tab-turnier');
+  assert.ok(tab, 'Admin sieht den Reiter nach Reaktivierung');
+  tab.click();
+  await warten(20);
+  assert.ok(admin.mock.aufrufe.some(a => a.tabelle === 'turnier_helfer' && a.m === 'select'), 'Helferübersicht lädt');
+  const mf = await leitstand('mf', {}, an);
+  assert.equal(mf.document.querySelectorAll('#tabs .tab-turnier').length, 0, 'MF sieht ihn weiterhin nicht');
 });
 
 test('Datenbankfehler werden verständlich angezeigt statt leerer Tabelle', async () => {

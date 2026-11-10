@@ -15,6 +15,7 @@
 #   scripts/staging.sh smoke <stufe>  Playwright-Smoke-Tests (ist|01|kompat|neu|09)
 #   scripts/staging.sh lauf01         Komplettlauf Migration 01: ist → 01 → R01 → 01
 #   scripts/staging.sh laufrollout    Rollout: 01–05 → altes FE kompatibel → neues FE → 09
+#   scripts/staging.sh ansichten      Design-Ansichten: 01–05+09, Ansichtsdaten, Aufnahmen nach tests/visuell/bilder
 #   scripts/staging.sh stop           Stack und Webserver beenden, Daten verwerfen
 #
 # Stack: eigenes Compose (staging/compose.yml) aus offiziellen Supabase-Images
@@ -197,6 +198,21 @@ case "${1:-}" in
       && echo "✓ SR/übrige Objekte nach 09 unverändert (echter Stack)"
     smoke 09              # neues Frontend nach Entzug des anonymen Tabellenzugriffs
     echo "✓ Staging-Lauf Rollout bestanden" ;;
+  ansichten)
+    stop >/dev/null 2>&1 || true
+    [ "${2:-}" = laufen-lassen ] || trap 'stop >/dev/null 2>&1 || true' EXIT
+    start
+    for m in 01 02 03 04 05 09; do migriere "$m"; done
+    psqlf -f "$ROOT/tests/visuell/seed_ansichten.sql"
+    frontend neu
+    lokale_werte
+    tok="$(psql -X -tA "$DBURL" -c "select abfrage_token from public.spieltermine where id = '00000000-0000-4000-e100-000000000008'")"
+    mkdir -p "$ROOT/tests/visuell/bilder"
+    docker run --rm --network host --ipc host --user "$(id -u):$(id -g)" \
+      -e HOME=/tmp -e CI=1 -e STAGING_FRONTEND="http://127.0.0.1:55381" -e ANSICHT_TOKEN="$tok" \
+      -v "$ROOT:/work" -w /work "$PLAYWRIGHT_IMAGE" \
+      npx --no-install playwright test --config tests/visuell/playwright.config.js --output /tmp/pw-out
+    echo "✓ Design-Ansichten erstellt: tests/visuell/bilder/" ;;
   stop)     stop ;;
   *) sed -n 2,20p "$0"; exit 2 ;;
 esac

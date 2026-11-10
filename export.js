@@ -58,7 +58,8 @@ async function _ladeExportDaten(mf, mitAufstellung) {
 
 async function exportExcel() {
   const btn = document.getElementById('btn-export');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Wird erstellt...'; }
+  const btnVorher = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Wird erstellt…'; }
 
   try {
     await ladeExcelJS();
@@ -251,7 +252,7 @@ async function exportExcel() {
     alert('Fehler beim Excel-Export: ' + SPS.fehlerText(err));
     console.error(err);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '📊 Excel exportieren'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = btnVorher; }
   }
 }
 
@@ -843,34 +844,35 @@ function zeigeExportMenu() {
   overlay.id = 'export-menu-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px';
 
-  function opt(label, sub, farbe, fn) {
-    return '<button data-fn="' + fn + '" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;padding:14px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:#1e3550;cursor:pointer;text-align:left;transition:all 140ms" ' +
-      'onmouseover="this.style.background=\'#2a445f\';this.style.borderColor=\'' + farbe + '\'" onmouseout="this.style.background=\'#1e3550\';this.style.borderColor=\'rgba(255,255,255,0.12)\'">' +
-      '<span style="font-size:14px;font-weight:700;color:#F7F9FF">' + label + '</span>' +
-      '<span style="font-size:11px;color:#8996B4">' + sub + '</span>' +
+  overlay.className = 'sp-modal';
+  function opt(label, sub, art, fn) {
+    return '<button class="auswahl-karte" data-fn="' + fn + '">' +
+      '<span class="ak-sym ' + (art === 'pdf' ? 'ak-pdf' : 'ak-xls') + '">' + (art === 'pdf' ? SYM.datei() : SYM.raster()) + '</span>' +
+      '<span><b>' + label + '</b><small>' + sub + '</small></span>' +
     '</button>';
   }
 
   overlay.innerHTML =
-    '<div style="background:#152232;border:1px solid rgba(255,255,255,0.14);border-radius:16px;max-width:420px;width:100%;overflow:hidden">' +
-      '<div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">' +
-        '<div>' +
-          '<div style="font-family:Bahnschrift SemiBold,sans-serif;font-size:15px;color:#F07830">Export</div>' +
-          '<div style="font-size:12px;color:#8996B4;margin-top:2px">' + SPS.esc(mfName) + ' · ' + SPS.esc(_rundeLabel()) + '</div>' +
+    '<div class="mdl" style="max-width:480px">' +
+      '<div class="mdl-kopf">' + SYM.laden() +
+        '<div style="min-width:0">' +
+          '<div class="mdl-kicker"><span>Export</span></div>' +
+          '<div class="mdl-titel">' + SPS.esc(mfName) + '</div>' +
+          '<div class="mdl-unter"><span>' + SYM.kalender() + SPS.esc(_rundeLabel()) + '</span></div>' +
         '</div>' +
-        '<button onclick="document.getElementById(\'export-menu-overlay\').remove()" style="background:none;border:none;color:#8996B4;font-size:20px;cursor:pointer">✕</button>' +
+        '<button class="mdl-zu" onclick="document.getElementById(\'export-menu-overlay\').remove()" aria-label="Schließen">' + SYM.kreuz() + '</button>' +
       '</div>' +
-      '<div style="padding:16px 20px">' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Abstimmung (Verfügbarkeit)</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">' +
-          opt('PDF', 'Karten-Layout', '#D4620A', 'exportPDF') +
-          opt('Excel', 'Tabelle farbig', '#1D9E75', 'exportExcel') +
-        '</div>' +
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:#8996B4;margin-bottom:8px">Einsatzplan (Aufstellung)</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-          opt('PDF', 'Karten-Layout', '#D4620A', 'exportAufstellungPDF') +
-          opt('Excel', 'Tabelle farbig', '#1D9E75', 'exportAufstellungExcel') +
-        '</div>' +
+      '<div class="mdl-inhalt">' +
+        '<div><div class="mdl-gruppe">Abstimmung (Verfügbarkeit)</div>' +
+        '<div class="exp-gruppe" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+          opt('PDF', 'Karten-Layout', 'pdf', 'exportPDF') +
+          opt('Excel', 'Tabelle farbig', 'xls', 'exportExcel') +
+        '</div></div>' +
+        '<div><div class="mdl-gruppe">Einsatzplan (Aufstellung)</div>' +
+        '<div class="exp-gruppe" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+          opt('PDF', 'Karten-Layout', 'pdf', 'exportAufstellungPDF') +
+          opt('Excel', 'Tabelle farbig', 'xls', 'exportAufstellungExcel') +
+        '</div></div>' +
       '</div>' +
     '</div>';
 

@@ -7,12 +7,12 @@ const { JSDOM } = require('jsdom');
 
 const ROOT = path.join(__dirname, '..');
 
-function seiteLaden(datei, { url, mock, vorbereiten } = {}) {
+function seiteLaden(datei, { url, mock, vorbereiten, quelltext } = {}) {
   let html = fs.readFileSync(path.join(ROOT, datei), 'utf8');
   html = html.replace(/<script src="https:\/\/[^"]+"[^>]*><\/script>/g,
     '<script>window.supabase = { createClient: function () { return window.__mock; } };</script>');
   html = html.replace(/<script src="([^":]+\.js)"><\/script>/g, (_, src) =>
-    '<script>' + fs.readFileSync(path.join(ROOT, src), 'utf8') + '\n</script>');
+    '<script>' + (quelltext ? quelltext(src, fs.readFileSync(path.join(ROOT, src), 'utf8')) : fs.readFileSync(path.join(ROOT, src), 'utf8')) + '\n</script>');
   const storageZugriffe = [];
   const dom = new JSDOM(html, {
     url: url || 'https://spielplanapp.christianaust.eu/' + datei,
