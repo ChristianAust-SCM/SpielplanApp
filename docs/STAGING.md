@@ -19,10 +19,21 @@ Die Browser laufen im offiziellen Image `mcr.microsoft.com/playwright:v1.49.1-no
 `apt`-Installation wäre systemweit. Die Specs blockieren und melden jede Browser-Anfrage
 an `*.supabase.co` oder `*.christianaust.eu`.
 
-**Hinweis Netz:** Die Supabase-CLI bindet API (55321), DB (55322) und Mailpit
-(55324) an `0.0.0.0`, also an alle Schnittstellen. Das lässt sich in der CLI nicht
-einschränken. Die Umgebung enthält nur synthetische Daten und lokale
-Standardschlüssel, und `lauf01` beendet sie am Ende automatisch.
+**Verbindliche Regel Netz (seit 10.11.2026):** Die Supabase-Testports (553xx: API, DB,
+Mailpit) dürfen **nicht ungeschützt auf allen Netzwerkschnittstellen** erreichbar sein.
+Die Supabase-CLI bindet sie an `0.0.0.0`, und das lässt sich in der CLI nicht abstellen.
+Beim Lauf am 10.11.2026 waren sie deshalb kurzzeitig ungeschützt offen; es lagen
+nur synthetische Daten darin.
+
+* `scripts/staging.sh` prüft die Bindungen nach dem Start. Ist ein Port auf
+  `0.0.0.0` oder `[::]` gebunden, wird der Stack **sofort beendet** (Exit 3).
+* Weiter geht es nur, wenn eine Absicherung eingerichtet und bestätigt ist:
+  * Host-Firewall: Regel in der `DOCKER-USER`-Kette, die 55320–55399 nur von
+    `127.0.0.1`/`docker0` zulässt. Docker umgeht `ufw`, daher muss es `DOCKER-USER` sein.
+  * Bestätigung pro Lauf: `STAGING_PORTS_GESCHUETZT=1 scripts/staging.sh lauf01`.
+* Die Firewall-Regel ist eine systemweite Änderung und braucht Christians Freigabe.
+* Alternative ohne Firewall: den Stack nicht über die CLI starten, sondern per
+  eigenem Compose mit `127.0.0.1:`-Portbindungen. Das ist noch nicht umgesetzt.
 
 Beim Start enthält die Datenbank die Baseline. Das ist der Ist-Zustand, am
 10.11.2026 mit den produktiven Spalten abgeglichen. Dazu kommen die Testdaten

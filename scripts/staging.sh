@@ -45,6 +45,28 @@ migration_datei() {
   esac
 }
 
+# Sicherheitsregel: Test-Ports dürfen nicht ungeschützt auf allen Netzwerk-
+# schnittstellen erreichbar sein. Die Supabase-CLI bindet an 0.0.0.0; ohne
+# nachgewiesene Absicherung (Host-Firewall bzw. DOCKER-USER-Regel, die 553xx
+# von außen sperrt) wird der Stack sofort wieder beendet.
+ports_pruefen() {
+  local offen
+  offen=$(docker ps --filter "name=_spielplan-staging" --format '{{.Names}} {{.Ports}}' \
+          | grep -E '(0\.0\.0\.0|\[::\]):553' || true)
+  if [ -n "$offen" ]; then
+    if [ "${STAGING_PORTS_GESCHUETZT:-0}" = "1" ]; then
+      echo "⚠ Ports auf allen Schnittstellen, Absicherung laut STAGING_PORTS_GESCHUETZT=1 bestätigt"
+    else
+      echo "✗ Staging-Ports sind auf allen Netzwerkschnittstellen erreichbar:" >&2
+      echo "$offen" | sed 's/^/    /' >&2
+      echo "  Abbruch. Erst Host-Firewall (DOCKER-USER) für 553xx einrichten und mit" >&2
+      echo "  STAGING_PORTS_GESCHUETZT=1 bestätigen – siehe docs/STAGING.md." >&2
+      supabase stop --workdir "$SW" --no-backup >/dev/null 2>&1 || true
+      exit 3
+    fi
+  fi
+}
+
 start() {
   # Supabase wendet staging/supabase/migrations beim Start an: dort liegt nur
   # die Baseline (Ist-Zustand). Echte Migrationen folgen gezielt per "migriere".
@@ -52,6 +74,7 @@ start() {
   cp "$ROOT/supabase/baseline/00_produktion_rekonstruiert.sql" "$SW/supabase/migrations/00000000000000_baseline.sql"
   cat "$ROOT/supabase/tests/_seed.sql" "$SW/seed_staging.sql" "$ROOT/supabase/tests/_sr_platzhalter.sql" > "$SW/supabase/seed.sql"
   supabase start --workdir "$SW"
+  ports_pruefen
   echo "✓ Staging läuft (API 127.0.0.1:55321, DB 127.0.0.1:55322), Ist-Zustand wie Produktion"
 }
 
